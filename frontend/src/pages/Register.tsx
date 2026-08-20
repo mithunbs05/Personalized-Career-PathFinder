@@ -7,34 +7,63 @@ import { NlpRegistrationBot } from '../components/NlpRegistrationBot';
 
 type RegistrationMode = 'form' | 'ai';
 
+interface FormErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+}
+
 export const Register: React.FC = () => {
   const [mode, setMode] = useState<RegistrationMode>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [generalError, setGeneralError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!name.trim()) {
+      errors.name = 'Full name is required.';
+    }
+
+    if (!email.trim()) {
+      errors.email = 'Email address is required.';
+    } else if (!emailRegex.test(email.trim())) {
+      errors.email = 'Please enter a valid email address (e.g. name@domain.com).';
+    }
+
+    if (!password) {
+      errors.password = 'Password is required.';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long.';
+    }
+
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password.';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage('');
+    setGeneralError('');
+    setSuccessMessage('');
 
-    if (!name.trim() || !email.trim() || !password) {
-      setErrorMessage('Please fill in all required fields.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.');
+    if (!validateForm()) {
       return;
     }
 
@@ -46,9 +75,13 @@ export const Register: React.FC = () => {
         password,
         confirmPassword,
       });
-      navigate('/onboarding');
+
+      setSuccessMessage('Account created successfully! Preparing your learning path...');
+      setTimeout(() => {
+        navigate('/onboarding');
+      }, 800);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Registration failed. Please try again.');
+      setGeneralError(err.message || 'Registration failed. Please check your details and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -57,8 +90,9 @@ export const Register: React.FC = () => {
   const isFieldComplete = (field: string) => {
     switch (field) {
       case 'name': return name.trim().length > 0;
-      case 'email': return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      case 'email': return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
       case 'password': return password.length >= 6;
+      case 'confirmPassword': return confirmPassword.length >= 6 && password === confirmPassword;
       default: return false;
     }
   };
@@ -193,10 +227,19 @@ export const Register: React.FC = () => {
             ))}
           </div>
 
-          {errorMessage && (
+          {/* General Error Banner */}
+          {generalError && (
             <div className="mb-5 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
+              <span>{generalError}</span>
+            </div>
+          )}
+
+          {/* Success Banner */}
+          {successMessage && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{successMessage}</span>
             </div>
           )}
 
@@ -210,7 +253,7 @@ export const Register: React.FC = () => {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                <form onSubmit={handleRegisterSubmit} className="space-y-4" noValidate>
                   {/* Full Name */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
@@ -222,12 +265,23 @@ export const Register: React.FC = () => {
                         id="register-name-input"
                         type="text"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                        }}
                         placeholder="e.g. Jordan Lee"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                          fieldErrors.name ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                       />
                     </div>
+                    {fieldErrors.name && (
+                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {fieldErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   {/* Email Address */}
@@ -241,12 +295,23 @@ export const Register: React.FC = () => {
                         id="register-email-input"
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                        }}
                         placeholder="jordan@example.com"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                          fieldErrors.email ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                       />
                     </div>
+                    {fieldErrors.email && (
+                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {fieldErrors.email}
+                      </p>
+                    )}
                   </div>
 
                   {/* Password */}
@@ -260,13 +325,24 @@ export const Register: React.FC = () => {
                         id="register-password-input"
                         type="password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                        }}
                         placeholder="••••••••"
                         required
                         minLength={6}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                          fieldErrors.password ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                       />
                     </div>
+                    {fieldErrors.password && (
+                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {fieldErrors.password}
+                      </p>
+                    )}
                   </div>
 
                   {/* Confirm Password */}
@@ -280,12 +356,23 @@ export const Register: React.FC = () => {
                         id="register-confirm-password-input"
                         type="password"
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                        }}
                         placeholder="••••••••"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                          fieldErrors.confirmPassword ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                       />
                     </div>
+                    {fieldErrors.confirmPassword && (
+                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {fieldErrors.confirmPassword}
+                      </p>
+                    )}
                   </div>
 
                   {/* Submit Button */}
