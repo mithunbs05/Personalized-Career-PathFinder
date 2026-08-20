@@ -4,11 +4,17 @@ import { motion } from 'motion/react';
 import { ArrowRight, Lock, Mail, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+interface FormErrors {
+  email?: string;
+  password?: string;
+}
+
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,11 +24,29 @@ export const Login: React.FC = () => {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email.trim()) {
+      errors.email = 'Please enter your email address.';
+    } else if (!emailRegex.test(email.trim())) {
+      errors.email = 'Please enter a valid email address.';
+    }
+
+    if (!password) {
+      errors.password = 'Please enter your password.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!email.trim()) {
-      setErrorMessage('Please enter your email address.');
+
+    if (!validateForm()) {
       return;
     }
 
@@ -30,12 +54,12 @@ export const Login: React.FC = () => {
     try {
       await login({
         email: email.trim(),
-        password: password || 'password123',
+        password,
         rememberMe,
       });
       navigate(from, { replace: true });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid credentials. Please try again.');
+      setErrorMessage(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -43,7 +67,7 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#F9F8F3] dark:bg-[#121211] text-[#1A1A1A] dark:text-[#F9F8F3] transition-colors duration-300">
-      {/* LEFT SIDE: Brand & Animated Journey Graphic (5 cols) */}
+      {/* LEFT SIDE: Brand & Editorial Journey (5 cols) */}
       <div className="hidden lg:flex lg:col-span-5 bg-[#F1EFE7]/80 dark:bg-[#1A1A18] p-12 flex-col justify-between border-r border-[#E8E6DE] dark:border-[#2C2C29] relative overflow-hidden">
         {/* Subtle glow */}
         <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-[#FF4D31]/10 rounded-full blur-3xl pointer-events-none" />
@@ -76,7 +100,6 @@ export const Login: React.FC = () => {
             <p className="text-sm text-[#4A4A4A] dark:text-[#A0A09B] leading-relaxed mb-8">
               Your personalized learning journey is waiting. Check your next milestone, continue active labs, and ask your AI mentor.
             </p>
-
           </motion.div>
         </div>
 
@@ -112,7 +135,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
             {/* Email Field */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
@@ -124,12 +147,23 @@ export const Login: React.FC = () => {
                   id="login-email-input"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
                   placeholder="alex@pathai.dev"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.email ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                 />
               </div>
+              {fieldErrors.email && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -151,18 +185,29 @@ export const Login: React.FC = () => {
                   id="login-password-input"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]"
+                  className={`w-full pl-10 pr-10 py-2.5 rounded-xl border ${
+                    fieldErrors.password ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#7A8B7C] hover:text-[#1A1A1A]"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#7A8B7C] hover:text-[#1A1A1A] cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {/* Options */}
