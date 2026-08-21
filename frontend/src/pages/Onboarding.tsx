@@ -1,75 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NlpOnboardingBot } from '../components/NlpOnboardingBot';
-import { UserProfile } from '../types/auth';
+import { onboardingService } from '../services/onboarding.service';
+import { supabase } from '../lib/supabase';
 
 export const Onboarding: React.FC = () => {
-  const [profile, setProfile] = useState<Partial<UserProfile>>({
-    targetGoal: 'Become an AI/ML Engineer',
-    experienceLevel: 'intermediate',
-    knownSkills: ['Python', 'SQL', 'Git'],
-    weeklyHours: 12,
-  });
-
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingPhase, setProcessingPhase] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { saveOnboarding } = useAuth();
   const navigate = useNavigate();
 
-  const handleComplete = async () => {
-    setIsProcessing(true);
-    setProcessingPhase(1);
+  /**
+   * Called when the bot signals completion or the user clicks "Generate Roadmap".
+   * Saves the extracted profile to Supabase via FastAPI and navigates to dashboard.
+   */
+  const handleComplete = useCallback(
+    async (extractedEntities: Record<string, unknown>, completedCategories: string[]) => {
+      setIsProcessing(true);
+      setProcessingPhase(1);
+      setSaveError(null);
 
-    setTimeout(() => setProcessingPhase(2), 900);
-    setTimeout(() => setProcessingPhase(3), 1800);
-    setTimeout(() => setProcessingPhase(4), 2700);
+      setTimeout(() => setProcessingPhase(2), 900);
+      setTimeout(() => setProcessingPhase(3), 1800);
+      setTimeout(() => setProcessingPhase(4), 2700);
 
-    setTimeout(async () => {
-      try {
-        await saveOnboarding({
-          targetGoal: profile.targetGoal || 'Become an AI/ML Engineer',
-          experienceLevel: profile.experienceLevel || 'intermediate',
-          knownSkills: profile.knownSkills && profile.knownSkills.length > 0 ? profile.knownSkills : ['Python', 'SQL'],
-          weeklyHours: profile.weeklyHours || 12,
-          educationDegree: profile.educationDegree || profile.education,
-          educationMajor: profile.educationMajor,
-          graduationYear: profile.graduationYear,
-          githubUrl: profile.githubUrl,
-          linkedinUrl: profile.linkedinUrl,
-          industryExperienceType: profile.industryExperienceType,
-          yearsExperience: profile.yearsExperience,
-          currentProjects: profile.currentProjects,
-          completedLearning: profile.completedLearning,
-          technicalInterests: profile.technicalInterests,
-          jobSpecialization: profile.jobSpecialization,
-          targetCompletionMonths: profile.targetCompletionMonths,
-          salaryPlacementGoal: profile.salaryPlacementGoal,
-          learningPreferences: profile.learningPreferences,
-          resourceBudget: profile.resourceBudget,
-          immediateMotivation: profile.immediateMotivation,
-        });
+      setTimeout(async () => {
+        try {
+          // 1. Get Supabase auth token for the profile save endpoint
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
 
-        confetti({
-          particleCount: 160,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#FF4D31', '#7A8B7C', '#1A1A1A', '#F9F8F3'],
-        });
+          if (token) {
+            // 2. Save profile via FastAPI → Supabase
+            await onboardingService.saveProfile(
+              {
+                profile_metadata: extractedEntities,
+                completed_categories: completedCategories,
+              },
+              token
+            );
+          }
 
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1200);
-      } catch (err) {
-        console.error('Onboarding submission error:', err);
-        navigate('/dashboard');
-      }
-    }, 3600);
-  };
+          // 3. Also save locally for the auth context (backward compat with existing dashboard)
+          await saveOnboarding({
+            targetGoal: (extractedEntities.target_goal as string) || 'AI/ML Engineer',
+            experienceLevel:
+              (extractedEntities.experience_level as 'beginner' | 'intermediate' | 'advanced') ||
+              'intermediate',
+            knownSkills:
+              Array.isArray(extractedEntities.known_skills) && extractedEntities.known_skills.length > 0
+                ? (extractedEntities.known_skills as string[])
+                : ['Python'],
+            weeklyHours: (extractedEntities.weekly_hours as number) || 10,
+            educationDegree: (extractedEntities.education_degree as string) || undefined,
+            educationMajor: (extractedEntities.education_major as string) || undefined,
+            graduationYear: (extractedEntities.graduation_year as string) || undefined,
+            githubUrl: (extractedEntities.github_url as string) || undefined,
+            linkedinUrl: (extractedEntities.linkedin_url as string) || undefined,
+            industryExperienceType:
+              (extractedEntities.industry_experience_type as 'fresher' | 'internship' | 'professional') ||
+              undefined,
+            yearsExperience: (extractedEntities.years_experience as string) || undefined,
+            currentProjects: (extractedEntities.current_projects as string) || undefined,
+            completedLearning: (extractedEntities.completed_learning as string) || undefined,
+            technicalInterests:
+              Array.isArray(extractedEntities.technical_interests)
+                ? (extractedEntities.technical_interests as string[])
+                : undefined,
+            jobSpecialization: (extractedEntities.job_specialization as string) || undefined,
+            targetCompletionMonths: (extractedEntities.target_completion_months as string) || undefined,
+            salaryPlacementGoal: (extractedEntities.salary_placement_goal as string) || undefined,
+            learningPreferences:
+              Array.isArray(extractedEntities.learning_preferences)
+                ? (extractedEntities.learning_preferences as string[])
+                : undefined,
+            resourceBudget: (extractedEntities.resource_budget as string) || undefined,
+            immediateMotivation: (extractedEntities.immediate_motivation as string) || undefined,
+            languagePreference: (extractedEntities.language_preference as string) || undefined,
+          });
+
+          confetti({
+            particleCount: 160,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#FF4D31', '#7A8B7C', '#1A1A1A', '#F9F8F3'],
+          });
+
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1200);
+        } catch (err) {
+          console.error('Onboarding submission error:', err);
+          setSaveError('Failed to save profile. Redirecting to dashboard...');
+          setTimeout(() => navigate('/dashboard'), 2000);
+        }
+      }, 3600);
+    },
+    [saveOnboarding, navigate]
+  );
 
   return (
     <div className="min-h-screen bg-[#F9F8F3] dark:bg-[#121211] text-[#1A1A1A] dark:text-[#F9F8F3] flex flex-col justify-between p-6 sm:p-12 transition-colors duration-300">
@@ -109,9 +143,13 @@ export const Onboarding: React.FC = () => {
                 PATHAI SYNTHESIS ENGINE
               </span>
               <h2 className="text-2xl sm:text-3xl font-display font-bold">
-                {processingPhase === 4 ? 'Profile Complete & Roadmap Ready!' : 'Synthesizing All 14 Onboarding Categories...'}
+                {processingPhase === 4 ? 'Profile Complete & Roadmap Ready!' : 'Synthesizing All 15 Onboarding Categories...'}
               </h2>
             </div>
+
+            {saveError && (
+              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">{saveError}</p>
+            )}
 
             <div className="max-w-md mx-auto space-y-3 text-left text-xs font-semibold">
               <div className={`p-3 rounded-xl flex items-center gap-3 transition-all ${processingPhase >= 1 ? 'bg-[#F1EFE7] dark:bg-[#252522] text-[#1A1A1A] dark:text-white' : 'text-[#7A8B7C]/50'}`}>
@@ -137,8 +175,6 @@ export const Onboarding: React.FC = () => {
           </motion.div>
         ) : (
           <NlpOnboardingBot
-            profile={profile}
-            setProfile={setProfile}
             onComplete={handleComplete}
             isSubmitting={isProcessing}
           />
