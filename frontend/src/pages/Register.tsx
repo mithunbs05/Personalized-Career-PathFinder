@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Lock, Mail, User, Sparkles, CheckCircle2, AlertCircle, MessageSquare, FormInput } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Lock, Mail, User, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { NlpRegistrationBot } from '../components/NlpRegistrationBot';
-
-type RegistrationMode = 'form' | 'ai';
 
 interface FormErrors {
   name?: string;
@@ -15,7 +12,6 @@ interface FormErrors {
 }
 
 export const Register: React.FC = () => {
-  const [mode, setMode] = useState<RegistrationMode>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,16 +80,6 @@ export const Register: React.FC = () => {
       setGeneralError(err.message || 'Registration failed. Please check your details and try again.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const isFieldComplete = (field: string) => {
-    switch (field) {
-      case 'name': return name.trim().length > 0;
-      case 'email': return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-      case 'password': return password.length >= 6;
-      case 'confirmPassword': return confirmPassword.length >= 6 && password === confirmPassword;
-      default: return false;
     }
   };
 
@@ -173,60 +159,6 @@ export const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Mode Toggle */}
-          <div className="mb-6 flex items-center gap-1 bg-[#F1EFE7] dark:bg-[#252522] p-1 rounded-full">
-            <button
-              id="register-mode-form"
-              type="button"
-              onClick={() => setMode('form')}
-              className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                mode === 'form'
-                  ? 'bg-white dark:bg-[#1A1A18] text-[#1A1A1A] dark:text-white shadow-sm'
-                  : 'text-[#4A4A4A] dark:text-[#A0A09B] hover:text-[#1A1A1A] dark:hover:text-white'
-              }`}
-            >
-              <FormInput className="w-3.5 h-3.5" />
-              <span>Standard Form</span>
-            </button>
-            <button
-              id="register-mode-ai"
-              type="button"
-              onClick={() => setMode('ai')}
-              className={`flex-1 py-2.5 px-4 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                mode === 'ai'
-                  ? 'bg-white dark:bg-[#1A1A18] text-[#1A1A1A] dark:text-white shadow-sm'
-                  : 'text-[#4A4A4A] dark:text-[#A0A09B] hover:text-[#1A1A1A] dark:hover:text-white'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>AI Assistant</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D31] animate-pulse" />
-            </button>
-          </div>
-
-          {/* Synced Field Badges - visible in both modes */}
-          <div className="mb-5 flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#7A8B7C] mr-1">Fields:</span>
-            {[
-              { key: 'name', label: name || 'Name', icon: User },
-              { key: 'email', label: email || 'Email', icon: Mail },
-              { key: 'password', label: password ? '••••••' : 'Password', icon: Lock },
-            ].map(({ key, label, icon: Icon }) => (
-              <span
-                key={key}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
-                  isFieldComplete(key)
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-[#F1EFE7] dark:bg-[#252522] border-[#E8E6DE] dark:border-[#2C2C29] text-[#7A8B7C]'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span className="max-w-[100px] truncate">{label}</span>
-                {isFieldComplete(key) && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-              </span>
-            ))}
-          </div>
-
           {/* General Error Banner */}
           {generalError && (
             <div className="mb-5 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2">
@@ -243,173 +175,139 @@ export const Register: React.FC = () => {
             </div>
           )}
 
-          {/* Animated content switch */}
-          <AnimatePresence mode="wait">
-            {mode === 'form' ? (
-              <motion.div
-                key="form-mode"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <form onSubmit={handleRegisterSubmit} className="space-y-4" noValidate>
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="register-name-input"
-                        type="text"
-                        value={name}
-                        onChange={(e) => {
-                          setName(e.target.value);
-                          if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
-                        }}
-                        placeholder="e.g. Jordan Lee"
-                        required
-                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
-                          fieldErrors.name ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
-                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
-                      />
-                    </div>
-                    {fieldErrors.name && (
-                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {fieldErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Email Address */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="register-email-input"
-                        type="email"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                        }}
-                        placeholder="jordan@example.com"
-                        required
-                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
-                          fieldErrors.email ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
-                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
-                      />
-                    </div>
-                    {fieldErrors.email && (
-                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {fieldErrors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Password */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="register-password-input"
-                        type="password"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                        }}
-                        placeholder="••••••••"
-                        required
-                        minLength={6}
-                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
-                          fieldErrors.password ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
-                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
-                      />
-                    </div>
-                    {fieldErrors.password && (
-                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {fieldErrors.password}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Confirm Password */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        id="register-confirm-password-input"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-                        }}
-                        placeholder="••••••••"
-                        required
-                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
-                          fieldErrors.confirmPassword ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
-                        } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
-                      />
-                    </div>
-                    {fieldErrors.confirmPassword && (
-                      <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {fieldErrors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Submit Button */}
-                  <button
-                    id="register-submit-button"
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full mt-2 py-3.5 rounded-full bg-[#FF4D31] hover:bg-[#E8402A] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#FF4D31]/20 disabled:opacity-50"
-                  >
-                    <span>{isSubmitting ? 'Creating Account...' : 'Create My Account →'}</span>
-                  </button>
-                </form>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="ai-mode"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <NlpRegistrationBot
-                  name={name}
-                  setName={setName}
-                  email={email}
-                  setEmail={setEmail}
-                  password={password}
-                  setPassword={setPassword}
-                  confirmPassword={confirmPassword}
-                  setConfirmPassword={setConfirmPassword}
-                  onSubmit={handleRegisterSubmit}
-                  isSubmitting={isSubmitting}
-                  onSwitchToForm={() => setMode('form')}
+          {/* Standard Form */}
+          <form onSubmit={handleRegisterSubmit} className="space-y-4" noValidate>
+            {/* Full Name */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
+                Full Name
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="register-name-input"
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                  }}
+                  placeholder="e.g. Jordan Lee"
+                  required
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.name ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
                 />
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+              {fieldErrors.name && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.name}
+                </p>
+              )}
+            </div>
+
+            {/* Email Address */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="register-email-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
+                  placeholder="jordan@example.com"
+                  required
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.email ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
+                />
+              </div>
+              {fieldErrors.email && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.email}
+                </p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="register-password-input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.password ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
+                />
+              </div>
+              {fieldErrors.password && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.password}
+                </p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#7A8B7C] mb-1.5">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-[#7A8B7C] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="register-confirm-password-input"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                  }}
+                  placeholder="••••••••"
+                  required
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.confirmPassword ? 'border-rose-500 bg-rose-500/5' : 'border-[#E8E6DE] dark:border-[#2C2C29]'
+                  } bg-[#F9F8F3] dark:bg-[#252522] text-sm text-[#1A1A1A] dark:text-white focus:outline-hidden focus:border-[#FF4D31]`}
+                />
+              </div>
+              {fieldErrors.confirmPassword && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {fieldErrors.confirmPassword}
+                </p>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <button
+              id="register-submit-button"
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full mt-2 py-3.5 rounded-full bg-[#FF4D31] hover:bg-[#E8402A] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#FF4D31]/20 disabled:opacity-50"
+            >
+              <span>{isSubmitting ? 'Creating Account...' : 'Create My Account →'}</span>
+            </button>
+          </form>
 
           {/* Footer link to Login */}
           <div className="mt-8 text-center text-xs text-[#4A4A4A] dark:text-[#A0A09B]">
@@ -427,3 +325,4 @@ export const Register: React.FC = () => {
     </div>
   );
 };
+
