@@ -31,6 +31,7 @@ export interface UserProfile {
   learningPreferences?: string[];
   resourceBudget?: string;
   immediateMotivation?: string;
+  languagePreference?: string;
   currentRoadmapId?: string;
 }
 

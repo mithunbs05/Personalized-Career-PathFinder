@@ -1,16 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Send, User, CheckCircle2, ArrowRight, Brain, CornerDownLeft, GraduationCap, Briefcase, Code, Target, Clock, BookOpen, Wallet, Flame, Globe, FolderGit2, Award, Layers, Heart } from 'lucide-react';
-import { nlpService, ChatMessage } from '../services/nlp.service';
-import { UserProfile } from '../types/auth';
+import {
+  Sparkles, Send, User, CheckCircle2, ArrowRight, Brain,
+  GraduationCap, Briefcase, Code, Target, Clock, BookOpen,
+  Wallet, Flame, Globe, FolderGit2, Award, Layers, Heart,
+  Languages,
+} from 'lucide-react';
+import { onboardingService, OnboardingApiError } from '../services/onboarding.service';
+import type {
+  OnboardingChatMessage,
+  OnboardingChatResponse,
+  ChatMessagePayload,
+} from '../types/onboarding';
 
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
 interface NlpOnboardingBotProps {
-  profile: Partial<UserProfile>;
-  setProfile: React.Dispatch<React.SetStateAction<Partial<UserProfile>>>;
-  onComplete: () => void;
+  onComplete: (extractedEntities: Record<string, unknown>, completedCategories: string[]) => void;
   isSubmitting: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// 15 Profile Categories
+// ---------------------------------------------------------------------------
 const CATEGORIES = [
   { key: 'education', label: 'Education', icon: GraduationCap },
   { key: 'professionalProfiles', label: 'Profiles', icon: Globe },
@@ -26,161 +39,224 @@ const CATEGORIES = [
   { key: 'learningFormat', label: 'Format', icon: Layers },
   { key: 'resourceBudget', label: 'Budget', icon: Wallet },
   { key: 'immediateMotivation', label: 'Motivation', icon: Flame },
-];
+  { key: 'languagePreference', label: 'Language', icon: Languages },
+] as const;
 
-function computeLocalCategories(profile: Partial<UserProfile>): string[] {
-  const completed: string[] = [];
-  if (profile?.educationDegree || profile?.education) completed.push('education');
-  if (profile?.githubUrl || profile?.linkedinUrl) completed.push('professionalProfiles');
-  if (profile?.industryExperienceType) completed.push('industryExperience');
-  if (Array.isArray(profile?.knownSkills) && profile.knownSkills.length > 0) completed.push('technicalStack');
-  if (profile?.currentProjects) completed.push('projects');
-  if (profile?.completedLearning) completed.push('completedLearning');
-  if (Array.isArray(profile?.technicalInterests) && profile.technicalInterests.length > 0) completed.push('technicalInterests');
-  if (profile?.targetGoal) completed.push('careerGoal');
-  if (profile?.targetCompletionMonths) completed.push('targetTimeline');
-  if (profile?.salaryPlacementGoal) completed.push('salaryGoal');
-  if (profile?.weeklyHours && profile.weeklyHours > 0) completed.push('weeklyHours');
-  if (Array.isArray(profile?.learningPreferences) && profile.learningPreferences.length > 0) completed.push('learningFormat');
-  if (profile?.resourceBudget) completed.push('resourceBudget');
-  if (profile?.immediateMotivation) completed.push('immediateMotivation');
-  return completed;
-}
+const TOTAL_CATEGORIES = CATEGORIES.length; // 15
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
-  profile,
-  setProfile,
   onComplete,
   isSubmitting,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg-onboard-init',
-      role: 'assistant',
-      content: "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap together.\n\nTell me about yourself — your educational background, career goal, and what technologies you already know. I'll guide you through all 14 profile categories conversationally.",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      suggestedReplies: [
-        'I have a B.Tech in CS and want to become an AI/ML Engineer. I know Python and SQL.',
-        'Self-taught developer with React and Node.js experience, targeting Full Stack roles.',
-        'Fresher with a CS degree, aiming for Tier-1 product company placements in ML.',
-      ],
-    },
-  ]);
+  // Chat messages for rendering
+  const [messages, setMessages] = useState<OnboardingChatMessage[]>([]);
 
+  // The cumulative extracted entities from all turns
+  const [extractedEntities, setExtractedEntities] = useState<Record<string, unknown>>({});
+
+  // Backend-driven completed categories
+  const [completedCategories, setCompletedCategories] = useState<string[]>([]);
+
+  // Profile completion flag from backend
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
+
+  // Input and processing states
   const [inputVal, setInputVal] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [completedCategories, setCompletedCategories] = useState<string[]>(() => computeLocalCategories(profile));
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Refs
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const scrollToBottom = () => {
+  // ---------------------------------------------------------------------------
+  // Scroll to bottom
+  // ---------------------------------------------------------------------------
+  const scrollToBottom = useCallback(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isProcessing]);
+  }, [messages, isProcessing, scrollToBottom]);
 
-  useEffect(() => {
-    setCompletedCategories(computeLocalCategories(profile));
-  }, [profile]);
+  // ---------------------------------------------------------------------------
+  // Build conversation history payload from messages
+  // ---------------------------------------------------------------------------
+  const buildHistoryPayload = useCallback(
+    (msgs: OnboardingChatMessage[]): ChatMessagePayload[] =>
+      msgs.map((m) => ({ role: m.role, content: m.content })),
+    []
+  );
 
-  const completedCount = completedCategories.length;
-  const progressPercent = Math.round((completedCount / 14) * 100);
+  // ---------------------------------------------------------------------------
+  // Process a backend response into state
+  // ---------------------------------------------------------------------------
+  const applyBackendResponse = useCallback(
+    (response: OnboardingChatResponse) => {
+      setExtractedEntities(response.extracted_entities);
+      setCompletedCategories(response.completed_categories);
+      setIsProfileComplete(response.is_profile_complete);
+      setErrorMessage(null);
 
-  const handleSendMessage = async (userText: string) => {
-    const text = userText.trim();
-    if (!text || isProcessing) return;
+      // Build extracted chips for UI display
+      const chips: { label: string; value: string; type: string }[] = [];
+      const e = response.extracted_entities;
+      if (e.education_degree) chips.push({ label: `Education: ${e.education_degree}`, value: String(e.education_degree), type: 'education' });
+      if (e.target_goal) chips.push({ label: `Goal: ${e.target_goal}`, value: String(e.target_goal), type: 'goal' });
+      if (Array.isArray(e.known_skills) && e.known_skills.length > 0) chips.push({ label: `Skills: ${(e.known_skills as string[]).join(', ')}`, value: (e.known_skills as string[]).join(', '), type: 'skills' });
+      if (e.weekly_hours) chips.push({ label: `Commitment: ${e.weekly_hours} hrs/wk`, value: String(e.weekly_hours), type: 'hours' });
+      if (e.industry_experience_type) chips.push({ label: `Experience: ${e.industry_experience_type}`, value: String(e.industry_experience_type), type: 'experience' });
+      if (e.target_completion_months) chips.push({ label: `Timeline: ${e.target_completion_months} months`, value: String(e.target_completion_months), type: 'timeline' });
 
-    setInputVal('');
-
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setIsProcessing(true);
-
-    try {
-      const history = messages.map((m) => ({
-        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.content,
-      }));
-
-      const res = await nlpService.parseProfileMessage(text, profile, undefined, history);
-
-      if (res.extractedProfile) {
-        setProfile((prev) => ({
-          ...prev,
-          ...res.extractedProfile,
-        }));
-      }
-
-      // Update categories from server response
-      if ((res as any).completedCategories) {
-        setCompletedCategories((res as any).completedCategories);
-      }
-
-      const extractedItems: string[] = [];
-      const ep = res.extractedProfile;
-      if (ep.educationDegree || ep.education) extractedItems.push(`Education: ${ep.educationDegree || ep.education}`);
-      if (ep.targetGoal) extractedItems.push(`Goal: ${ep.targetGoal}`);
-      if (ep.knownSkills && ep.knownSkills.length > 0) extractedItems.push(`Skills: ${ep.knownSkills.join(', ')}`);
-      if (ep.weeklyHours) extractedItems.push(`Commitment: ${ep.weeklyHours} hrs/wk`);
-      if (ep.githubUrl) extractedItems.push(`GitHub: Connected`);
-      if (ep.linkedinUrl) extractedItems.push(`LinkedIn: Connected`);
-      if (ep.industryExperienceType) extractedItems.push(`Experience: ${ep.industryExperienceType}`);
-      if (ep.targetCompletionMonths) extractedItems.push(`Timeline: ${ep.targetCompletionMonths} months`);
-      if (ep.immediateMotivation) extractedItems.push(`Motivation: ${ep.immediateMotivation}`);
-      if (ep.resourceBudget) extractedItems.push(`Budget: ${ep.resourceBudget}`);
-
-      const botMsg: ChatMessage = {
+      const botMsg: OnboardingChatMessage = {
         id: `bot-${Date.now()}`,
         role: 'assistant',
-        content: res.botReply,
+        content: response.assistant_message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggestedReplies: res.suggestedReplies || [],
-        extractedChips: extractedItems.map((item) => ({
-          label: item,
-          value: item,
-          type: item.split(':')[0].toLowerCase(),
-        })),
-        isCompletePrompt: res.isComplete,
+        quickReplyChips: response.quick_reply_chips,
+        extractedChips: chips.length > 0 ? chips : undefined,
+        isCompletePrompt: response.is_profile_complete,
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    } catch (err) {
-      console.error('Onboarding chat error:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `bot-err-${Date.now()}`,
+    },
+    []
+  );
+
+  // ---------------------------------------------------------------------------
+  // Initialize: fetch welcome message from backend
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (hasInitialized) return;
+
+    const initChat = async () => {
+      setHasInitialized(true);
+      setIsProcessing(true);
+
+      try {
+        const response = await onboardingService.sendChat({
+          conversation_history: [],
+          extracted_entities: {},
+        });
+        applyBackendResponse(response);
+      } catch (err) {
+        console.error('Failed to initialize onboarding chat:', err);
+        // Provide a local fallback welcome message
+        const fallbackMsg: OnboardingChatMessage = {
+          id: 'msg-onboard-init',
           role: 'assistant',
-          content: "I've noted your preferences! You can continue chatting to fill more categories, or click 'Generate Roadmap' below to finalize your profile.",
+          content:
+            "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap together.\n\nTell me about yourself — your educational background, career goal, and what technologies you already know. I'll guide you through all 15 profile categories conversationally.",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggestedReplies: ['Generate My Custom Roadmap Now 🚀', 'Add more details about my projects'],
-        },
-      ]);
-    } finally {
-      setIsProcessing(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  };
+          quickReplyChips: [
+            'I have a B.Tech in CS and want to become an AI/ML Engineer. I know Python and SQL.',
+            'Self-taught developer with React and Node.js experience, targeting Full Stack roles.',
+            'Fresher with a CS degree, aiming for Tier-1 product company placements in ML.',
+          ],
+        };
+        setMessages([fallbackMsg]);
+        if (err instanceof OnboardingApiError) {
+          setErrorMessage(err.message);
+        }
+      } finally {
+        setIsProcessing(false);
+      }
+    };
 
-  const handleQuickReply = (reply: string) => {
-    if (reply.toLowerCase().includes('generate') || reply.toLowerCase().includes('roadmap') || reply.toLowerCase().includes('ready')) {
-      onComplete();
-      return;
-    }
-    handleSendMessage(reply);
-  };
+    initChat();
+  }, [hasInitialized, applyBackendResponse]);
 
+  // ---------------------------------------------------------------------------
+  // Send a user message
+  // ---------------------------------------------------------------------------
+  const handleSendMessage = useCallback(
+    async (userText: string) => {
+      const text = userText.trim();
+      if (!text || isProcessing) return;
+
+      setInputVal('');
+      setErrorMessage(null);
+
+      // Add user message to chat
+      const userMsg: OnboardingChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: text,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      const updatedMessages = [...messages, userMsg];
+      setMessages(updatedMessages);
+      setIsProcessing(true);
+
+      try {
+        const response = await onboardingService.sendChat({
+          conversation_history: buildHistoryPayload(updatedMessages),
+          extracted_entities: extractedEntities,
+        });
+        applyBackendResponse(response);
+      } catch (err) {
+        console.error('Onboarding chat error:', err);
+        const errMsg = err instanceof OnboardingApiError
+          ? err.message
+          : 'Something went wrong. Please try again.';
+        setErrorMessage(errMsg);
+
+        // Add a friendly error recovery message
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `bot-err-${Date.now()}`,
+            role: 'assistant',
+            content:
+              "I had a brief hiccup! You can continue chatting to share more details, or click 'Generate Roadmap' below to finalize your profile with what we have so far.",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            quickReplyChips: [
+              'Tell me about my education and goals',
+              'Generate My Roadmap Now 🚀',
+            ],
+          },
+        ]);
+      } finally {
+        setIsProcessing(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    },
+    [isProcessing, messages, extractedEntities, buildHistoryPayload, applyBackendResponse]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Handle quick reply chip click
+  // ---------------------------------------------------------------------------
+  const handleQuickReply = useCallback(
+    (reply: string) => {
+      const lower = reply.toLowerCase();
+      if (lower.includes('generate') && (lower.includes('roadmap') || lower.includes('ready'))) {
+        onComplete(extractedEntities, completedCategories);
+        return;
+      }
+      handleSendMessage(reply);
+    },
+    [handleSendMessage, onComplete, extractedEntities, completedCategories]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Computed values
+  // ---------------------------------------------------------------------------
+  const completedCount = completedCategories.length;
+  const progressPercent = Math.round((completedCount / TOTAL_CATEGORIES) * 100);
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <div className="bg-white dark:bg-[#1A1A18] rounded-3xl border border-[#E8E6DE] dark:border-[#2C2C29] shadow-xl overflow-hidden flex flex-col h-[700px] max-w-4xl mx-auto">
-      {/* 14-Category Progress Tracker Bar */}
+      {/* 15-Category Progress Tracker Bar */}
       <div className="bg-[#F9F8F3] dark:bg-[#252522] px-4 sm:px-6 py-3 border-b border-[#E8E6DE] dark:border-[#2C2C29] space-y-3">
         {/* Header Row */}
         <div className="flex items-center justify-between">
@@ -192,7 +268,7 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-[#1A1A1A] dark:text-white">
-              {completedCount}/14
+              {completedCount}/{TOTAL_CATEGORIES}
             </span>
             <span className="text-[10px] font-bold text-[#7A8B7C] uppercase">Categories</span>
           </div>
@@ -231,6 +307,22 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
           })}
         </div>
       </div>
+
+      {/* Error Banner */}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2"
+          >
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+              ⚠️ {errorMessage}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chat Messages Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -279,20 +371,34 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
                   </div>
                 )}
 
-                {/* Suggested replies */}
-                {msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+                {/* Dynamic quick reply chips from backend */}
+                {msg.quickReplyChips && msg.quickReplyChips.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {msg.suggestedReplies.map((reply, idx) => (
+                    {msg.quickReplyChips.map((chip, idx) => (
                       <button
                         key={idx}
                         type="button"
-                        onClick={() => handleQuickReply(reply)}
-                        className="px-3.5 py-1.5 rounded-full bg-[#F1EFE7] dark:bg-[#252522] hover:bg-[#FF4D31] hover:text-white text-[#1A1A1A] dark:text-[#F9F8F3] text-xs font-semibold border border-[#E8E6DE] dark:border-[#2C2C29] transition-all cursor-pointer shadow-xs text-left"
+                        onClick={() => handleQuickReply(chip)}
+                        disabled={isProcessing}
+                        className="px-3.5 py-1.5 rounded-full bg-[#F1EFE7] dark:bg-[#252522] hover:bg-[#FF4D31] hover:text-white text-[#1A1A1A] dark:text-[#F9F8F3] text-xs font-semibold border border-[#E8E6DE] dark:border-[#2C2C29] transition-all cursor-pointer shadow-xs text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {reply}
+                        {chip}
                       </button>
                     ))}
                   </div>
+                )}
+
+                {/* Completion prompt */}
+                {msg.isCompletePrompt && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mt-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800"
+                  >
+                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      ✅ Your profile is ready! Click "Generate Roadmap" below to create your personalized learning path.
+                    </p>
+                  </motion.div>
                 )}
               </div>
             </motion.div>
@@ -302,7 +408,7 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
         {isProcessing && (
           <div className="flex items-center gap-3 text-[#7A8B7C] text-xs font-semibold p-4">
             <div className="w-5 h-5 rounded-full border-2 border-[#FF4D31] border-t-transparent animate-spin" />
-            <span>PathAI is analyzing your profile across 14 categories...</span>
+            <span>PathAI is thinking...</span>
           </div>
         )}
 
@@ -338,7 +444,7 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
 
         <button
           type="button"
-          onClick={onComplete}
+          onClick={() => onComplete(extractedEntities, completedCategories)}
           disabled={isSubmitting}
           className="px-6 py-3 rounded-2xl bg-[#1A1A1A] hover:bg-black dark:bg-white dark:hover:bg-stone-200 text-white dark:text-[#1A1A1A] font-bold text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
         >
