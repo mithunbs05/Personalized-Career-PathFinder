@@ -32,22 +32,7 @@ export const Onboarding: React.FC = () => {
 
       setTimeout(async () => {
         try {
-          // 1. Get Supabase auth token for the profile save endpoint
-          const { data: sessionData } = await supabase.auth.getSession();
-          const token = sessionData?.session?.access_token;
-
-          if (token) {
-            // 2. Save profile via FastAPI → Supabase
-            await onboardingService.saveProfile(
-              {
-                profile_metadata: extractedEntities,
-                completed_categories: completedCategories,
-              },
-              token
-            );
-          }
-
-          // 3. Also save locally for the auth context (backward compat with existing dashboard)
+          // 1. Save locally to auth context / localStorage (guarantees local JSON temp persistence)
           await saveOnboarding({
             targetGoal: (extractedEntities.target_goal as string) || 'AI/ML Engineer',
             experienceLevel:
@@ -85,6 +70,20 @@ export const Onboarding: React.FC = () => {
             languagePreference: (extractedEntities.language_preference as string) || undefined,
           });
 
+          // 2. Sync to Supabase via FastAPI backend
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError || !sessionData.session?.access_token) {
+            throw new Error('No active Supabase session. Please sign in again before saving your roadmap.');
+          }
+
+          await onboardingService.saveProfile(
+            {
+              profile_metadata: extractedEntities,
+              completed_categories: completedCategories,
+            },
+            sessionData.session.access_token
+          );
+
           confetti({
             particleCount: 160,
             spread: 80,
@@ -97,8 +96,12 @@ export const Onboarding: React.FC = () => {
           }, 1200);
         } catch (err) {
           console.error('Onboarding submission error:', err);
-          setSaveError('Failed to save profile. Redirecting to dashboard...');
-          setTimeout(() => navigate('/dashboard'), 2000);
+          setIsProcessing(false);
+          setSaveError(
+            err instanceof Error
+              ? err.message
+              : 'Could not save your profile to Supabase. Please try again.'
+          );
         }
       }, 3600);
     },

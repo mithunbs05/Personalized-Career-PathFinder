@@ -131,11 +131,13 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
   // ---------------------------------------------------------------------------
   // Initialize: fetch welcome message from backend
   // ---------------------------------------------------------------------------
+  const initRef = useRef(false);
+
   useEffect(() => {
-    if (hasInitialized) return;
+    if (initRef.current) return;
+    initRef.current = true;
 
     const initChat = async () => {
-      setHasInitialized(true);
       setIsProcessing(true);
 
       try {
@@ -151,12 +153,13 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
           id: 'msg-onboard-init',
           role: 'assistant',
           content:
-            "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap together.\n\nTell me about yourself — your educational background, career goal, and what technologies you already know. I'll guide you through all 15 profile categories conversationally.",
+            "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap together across 15 diagnostic categories.\n\nTo begin, what are your **education details**? (Please share your degree, major/branch, and graduation year).",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           quickReplyChips: [
-            'I have a B.Tech in CS and want to become an AI/ML Engineer. I know Python and SQL.',
-            'Self-taught developer with React and Node.js experience, targeting Full Stack roles.',
-            'Fresher with a CS degree, aiming for Tier-1 product company placements in ML.',
+            'B.Tech Computer Science (2025)',
+            'B.Sc Information Technology (2024)',
+            'MCA (2026)',
+            'Non-CS Degree background',
           ],
         };
         setMessages([fallbackMsg]);
@@ -169,7 +172,7 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
     };
 
     initChat();
-  }, [hasInitialized, applyBackendResponse]);
+  }, [applyBackendResponse]);
 
   // ---------------------------------------------------------------------------
   // Send a user message

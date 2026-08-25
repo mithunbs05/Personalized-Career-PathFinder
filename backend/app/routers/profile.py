@@ -66,6 +66,7 @@ async def save_learner_profile(
             user_id=user_id,
             profile_metadata=request.profile_metadata,
             completed_categories=request.completed_categories,
+            access_token=token,
         )
 
         if not result["success"]:
