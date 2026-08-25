@@ -1,8 +1,25 @@
 """
-Onboarding conversational service powered by LangChain + GPT-4.1-nano.
+Onboarding conversational service powered by LangChain + OpenAI.
 
-Drives a multi-turn career-counselor conversation to extract 15 learner profile
-dimensions naturally, producing structured JSON output on every turn.
+Drives a structured 15-question career diagnostic conversation:
+1. Education details (degree, major, graduation year)
+2. Professional profile links (GitHub, LinkedIn)
+3. Industry experience status
+4. Known tech stack
+5. Current ongoing projects / portfolio
+6. Completed courses / bootcamps / certifications
+7. Technical interests & problem domains
+8. Target career role / specialization
+9. Target timeline / deadline
+10. Target salary / placement tier
+11. Weekly time commitment (hours/week)
+12. Preferred learning format
+13. Resource budget preference
+14. Immediate motivation / trigger event
+15. Preferred language
+
+Performs polite validation on invalid answers, generates question-specific
+quick reply suggestions, maintains cumulative JSON state, and prepares data for Supabase.
 """
 
 from __future__ import annotations
@@ -12,7 +29,8 @@ import logging
 from typing import Any
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.output_parsers import JsonOutputParser
 
 from app.core.config import get_settings
@@ -20,7 +38,7 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# 15 Category slugs (canonical keys)
+# 15 Canonical Category Slugs
 # ---------------------------------------------------------------------------
 CATEGORY_SLUGS = [
     "education",
@@ -41,80 +59,103 @@ CATEGORY_SLUGS = [
 ]
 
 # ---------------------------------------------------------------------------
-# System Prompt
+# System Prompt for LangChain
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = """You are **PathAI**, a welcoming, adaptive, and diagnostic career-counselor assistant for an AI-powered personalized learning platform.
+SYSTEM_PROMPT = """You are **PathAI Onboarding Assistant**, an intelligent, polite, and structured AI career diagnostic bot.
 
-Your job is to have a **natural conversation** with a learner to gather information across exactly **15 profile categories**. Never overwhelm the user — ask only 1 to 2 relevant questions at a time. If the user provides information about multiple categories in a single message, extract all of them simultaneously.
+Your primary objective is to ask the user EXACTLY 15 specific profile questions (and NO OTHER questions outside of these 15), systematically in order or following up on unfulfilled ones.
 
-## The 15 Profile Categories to Extract
-1. **education** — Degree, branch/major, graduation year
-2. **professionalProfiles** — GitHub URL, LinkedIn URL (or explicit "skip")
-3. **industryExperience** — Fresher, intern, or working professional with years of experience
-4. **technicalStack** — Languages, frameworks, tools the learner already knows
-5. **projects** — Past builds, ongoing projects, or zero projects
-6. **completedLearning** — Completed bootcamps, NPTEL, Coursera courses, or college-only
-7. **technicalInterests** — Sub-domains (e.g., Multi-Agent AI, RAG, Web Dev, Embedded Systems)
-8. **careerGoal** — Desired specialization or target job profile
-9. **targetTimeline** — Target deadline (e.g., 3 months, 6 months, campus drive date)
-10. **salaryGoal** — Target compensation tier (e.g., ₹10–12 LPA, FAANG, Tier-1 product)
-11. **weeklyHours** — Realistic study/coding hours available per week
-12. **learningFormat** — Video walkthroughs, official docs, or project-first interactive coding
-13. **resourceBudget** — Free/open-source only vs paid certifications
-14. **immediateMotivation** — Placement drive, hackathon, certification exam, career switch
-15. **languagePreference** — Preferred language for instruction and documentation
+## THE MANDATORY 15 QUESTIONS (STRICT SCOPE):
+1. **education** — Education details: Degree name, Major/Branch, and Graduation Year.
+2. **professionalProfiles** — GitHub and LinkedIn profile links (or explicit "skip").
+3. **industryExperience** — Industry experience status: Fresher, Internship experience, or Working Professional with years of experience.
+4. **technicalStack** — Known tech stack: Programming languages, frameworks, and tools already familiar with.
+5. **projects** — Current ongoing projects or past portfolio builds (or "none").
+6. **completedLearning** — Already completed courses, bootcamps, and official certifications (or "none").
+7. **technicalInterests** — Personal areas of technical interest and preferred problem domains (e.g. AI/ML, Cloud, Web Dev, Mobile).
+8. **careerGoal** — Target career role or desired job specialization (e.g. AI Engineer, Full Stack Developer).
+9. **targetTimeline** — Target timeline and deadline to achieve the goal (e.g. 3 months, 6 months, 1 year).
+10. **salaryGoal** — Target salary benchmark or company placement tier (e.g. product startup, tier-1 placement, ₹10-12 LPA).
+11. **weeklyHours** — Weekly time commitment: Realistic study and coding hours available per week (e.g. 10 hours, 20 hours).
+12. **learningFormat** — Preferred learning format (video walkthroughs, official documentation, or project-first interactive coding).
+13. **resourceBudget** — Resource budget preference (free/open-source materials only vs paid courses/certifications).
+14. **immediateMotivation** — Immediate motivation or upcoming trigger event (e.g. campus placement drive, upcoming hackathon, certification exam, career switch).
+15. **languagePreference** — Preferred language for learning and instruction (e.g. English, Hindi, Hinglish).
 
-## Rules
-- Be warm, encouraging, and conversational. Use emojis sparingly but naturally.
-- Acknowledge what the user shared before asking the next question.
-- If the user gives a complex response covering multiple categories, extract ALL of them.
-- Never repeat information you already collected unless the user wants to change it.
-- For professional profiles, accept "skip", "none", "don't have one" as valid responses.
-- For weekly hours, convert natural language like "a couple hours a day" into a numeric weekly estimate.
-- Set `is_profile_complete` to true when **all 15 categories** have at least some value, OR when at least **12 of 15** categories are filled and the user expresses readiness to proceed.
-
-## Output Format
-You MUST respond with valid JSON matching this exact schema on EVERY turn:
-```json
-{
-  "assistant_message": "Your natural language reply and next question(s)",
-  "quick_reply_chips": ["chip1", "chip2", "chip3"],
-  "extracted_entities": {
-    "education_degree": "string or null",
-    "education_major": "string or null",
-    "graduation_year": "string or null",
-    "github_url": "string or null",
-    "linkedin_url": "string or null",
-    "industry_experience_type": "fresher | intern | working_professional | null",
-    "years_experience": "string or null",
-    "known_skills": ["skill1", "skill2"] or null,
-    "current_projects": "string or null",
-    "completed_learning": "string or null",
-    "technical_interests": ["interest1"] or null,
-    "target_goal": "string or null",
-    "job_specialization": "string or null",
-    "target_completion_months": "string or null",
-    "salary_placement_goal": "string or null",
-    "weekly_hours": number or null,
-    "learning_preferences": ["pref1"] or null,
-    "resource_budget": "string or null",
-    "immediate_motivation": "string or null",
-    "language_preference": "string or null",
-    "experience_level": "beginner | intermediate | advanced | null"
-  },
-  "completed_categories": ["category_slug_1", "category_slug_2"],
-  "is_profile_complete": false
-}
-```
-
-IMPORTANT: The `extracted_entities` must contain the FULL MERGED state — include ALL previously extracted values plus any new ones from this turn. Do NOT drop previously collected data.
-
-When the conversation is just starting (empty history), send an enthusiastic welcome message introducing yourself and asking the learner to share about their background in a natural way.
+## STRICT OPERATIONAL RULES:
+1. **ONLY THESE 15 QUESTIONS**: You MUST ONLY gather data for these 15 questions. Do NOT ask any off-topic, extraneous, or unrelated questions.
+2. **QUESTION SEQUENCE & FOCUS**: Focus on asking the next uncompleted category out of the 15. If the user voluntarily provides info for multiple categories in one message, extract all valid ones and move to the next unfulfilled question.
+3. **POLITE ANSWER VALIDATION**:
+   - Before extracting an answer into `extracted_entities`, VALIDATE IT for correctness and realism.
+   - **Validation Checks**:
+     - *education*: Degree and Major should be valid text; Graduation Year should be a reasonable 4-digit year (e.g. 2020-2030) or "pursuing".
+     - *professionalProfiles*: Should be valid profile URLs or text containing github/linkedin OR explicitly 'skip'/'none'. If user enters gibberish like 'xyz123', fail validation!
+     - *industryExperience*: Must be fresher, intern, or working professional with valid years (0-40).
+     - *weeklyHours*: Must be a realistic positive number between 1 and 100 hours/week. If user enters negative, 0, or unrealistic numbers (like 200), fail validation!
+     - *targetTimeline*: Must be a realistic timeframe (e.g. 1-24 months).
+     - *General*: If the user's input is gibberish, vulgar, or completely irrelevant to the question asked, fail validation!
+   - **IF VALIDATION FAILS**:
+     - Do NOT save the invalid value into `extracted_entities`.
+     - Respond in a **polite, encouraging, and courteous manner**, explaining clearly why the answer could not be validated (e.g., "I couldn't validate your profile links. Please enter a valid URL or type 'skip' to continue.").
+     - Provide quick reply chips with valid sample answers so the user can easily click one.
+     - Re-ask the current question politely.
+4. **QUESTION-SPECIFIC SUGGESTIONS (`quick_reply_chips`)**:
+   - For EVERY turn, the `quick_reply_chips` array MUST contain 3 to 4 realistic, clickable sample answers tailored DIRECTLY to the question currently being asked!
+   - Examples:
+     - For Education: ["B.Tech CS (2025)", "B.Sc IT (2024)", "MCA (2026)", "Non-CS Background"]
+     - For Profiles: ["github.com/myusername", "linkedin.com/in/myprofile", "Skip profile links for now"]
+     - For Experience: ["Fresher / Student", "Internship Experience", "Working Professional (1-3 yrs)", "Working Professional (3+ yrs)"]
+     - For Tech Stack: ["Python, JavaScript, React", "Java, Spring Boot, SQL", "C++, Data Structures", "Beginner / Starting fresh"]
+     - For Projects: ["Full-stack E-commerce app", "Machine Learning Sentiment Model", "Portfolio Website", "No major projects yet"]
+     - For Learning: ["Completed Coursera ML Specialization", "Udemy Web Dev Bootcamp", "College coursework only", "Self-taught online docs"]
+     - For Interests: ["AI/ML & LLMs", "Full Stack Web Dev", "Cloud & DevOps", "Cybersecurity & Networks"]
+     - For Career Goal: ["AI / ML Engineer", "Full Stack Developer", "Data Scientist", "Backend Engineer"]
+     - For Timeline: ["3 Months", "6 Months", "9 Months", "1 Year"]
+     - For Salary: ["Tier-1 Product Company", "Product Startup", "FAANG / Big Tech", "Entry Level"]
+     - For Weekly Hours: ["5-10 hours/week", "10-20 hours/week", "20-30 hours/week", "30+ hours/week"]
+     - For Learning Format: ["Project-first interactive coding", "Video walkthroughs & tutorials", "Official documentation", "Hybrid Mix"]
+     - For Budget: ["Free / Open-Source only", "Open to Paid Courses & Certifications", "Flexible Budget"]
+     - For Motivation: ["Campus Placement Drive", "Upcoming Hackathon", "Career Switch / Job Hunt", "Skill Upgrading"]
+     - For Language: ["English", "Hindi", "Hinglish", "Spanish"]
+5. **JSON OUTPUT STRUCTURE**:
+   You MUST return a valid JSON object matching this schema on EVERY turn:
+   ```json
+   {
+     "assistant_message": "Your polite reply, validation feedback (if invalid), and next question",
+     "quick_reply_chips": ["chip1", "chip2", "chip3", "chip4"],
+     "extracted_entities": {
+       "education_degree": "string or null",
+       "education_major": "string or null",
+       "graduation_year": "string or null",
+       "github_url": "string or null",
+       "linkedin_url": "string or null",
+       "industry_experience_type": "fresher | intern | working_professional | null",
+       "years_experience": "string or null",
+       "known_skills": ["skill1", "skill2"] or null,
+       "current_projects": "string or null",
+       "completed_learning": "string or null",
+       "technical_interests": ["interest1", "interest2"] or null,
+       "target_goal": "string or null",
+       "job_specialization": "string or null",
+       "target_completion_months": "string or null",
+       "salary_placement_goal": "string or null",
+       "weekly_hours": number or null,
+       "learning_preferences": ["pref1"] or null,
+       "resource_budget": "free_only | mixture | paid_acceptable | null",
+       "immediate_motivation": "string or null",
+       "language_preference": "string or null",
+       "experience_level": "beginner | intermediate | advanced | null"
+     },
+     "completed_categories": ["category_slug_1", "category_slug_2"],
+     "is_profile_complete": false
+   }
+   ```
+   IMPORTANT: `extracted_entities` MUST carry forward ALL previously validated values, merged with new validated values. Never erase previously validated data. Set `is_profile_complete` to true ONLY when ALL 15 categories are filled with validated data.
 """
 
 
 def _build_llm() -> ChatOpenAI:
-    """Build the LangChain ChatOpenAI instance for gpt-4.1-nano."""
+    """Build the LangChain ChatOpenAI instance."""
     settings = get_settings()
     if not settings.OPENAI_API_KEY:
         raise RuntimeError(
@@ -124,14 +165,14 @@ def _build_llm() -> ChatOpenAI:
         model="gpt-4.1-nano",
         api_key=settings.OPENAI_API_KEY,
         base_url=settings.OPENAI_API_BASE_URL,
-        temperature=0.7,
-        max_tokens=1200,
+        temperature=0.4,
+        max_tokens=1400,
         model_kwargs={"response_format": {"type": "json_object"}},
     )
 
 
 def _compute_completed_categories(entities: dict[str, Any]) -> list[str]:
-    """Determine which of the 15 categories have been filled."""
+    """Determine which of the 15 categories have been filled with validated data."""
     completed: list[str] = []
 
     # 1. Education
@@ -206,12 +247,12 @@ def _compute_completed_categories(entities: dict[str, Any]) -> list[str]:
 def _merge_entities(
     existing: dict[str, Any], newly_extracted: dict[str, Any]
 ) -> dict[str, Any]:
-    """Merge newly extracted entities into the existing state without losing data."""
+    """Merge newly validated entities into the existing JSON state without losing data."""
     merged = {**existing}
     for key, value in newly_extracted.items():
         if value is None:
             continue
-        # For lists, merge without duplicates
+        # For lists, merge unique items
         if isinstance(value, list) and isinstance(merged.get(key), list):
             seen = set(merged[key])
             for item in value:
@@ -228,11 +269,11 @@ async def process_onboarding_turn(
     current_entities: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Process a single conversational turn for onboarding.
+    Process a single conversational turn using a LangChain chain.
 
     Args:
         conversation_history: List of {"role": "user"|"assistant", "content": "..."} dicts.
-        current_entities: The current extracted entity state from prior turns.
+        current_entities: The current extracted entity state JSON from prior turns.
 
     Returns:
         Dict with: assistant_message, quick_reply_chips, extracted_entities,
@@ -241,56 +282,53 @@ async def process_onboarding_turn(
     try:
         llm = _build_llm()
 
-        # Build the LangChain message list
-        messages = [SystemMessage(content=SYSTEM_PROMPT)]
+        # Build LangChain Messages
+        langchain_messages: list[Any] = [SystemMessage(content=SYSTEM_PROMPT)]
 
-        # Include the current entity state in the system context
+        # Include current validated entity JSON in system context
         if current_entities:
             entity_context = (
-                f"\n\nCurrent extracted profile state from previous turns:\n"
+                f"\n\nCurrent validated profile JSON state from previous turns:\n"
                 f"```json\n{json.dumps(current_entities, indent=2, default=str)}\n```\n"
-                f"\nCompleted categories so far: {_compute_completed_categories(current_entities)}"
+                f"\nCompleted categories so far ({len(_compute_completed_categories(current_entities))}/15): "
+                f"{_compute_completed_categories(current_entities)}"
             )
-            messages.append(SystemMessage(content=entity_context))
+            langchain_messages.append(SystemMessage(content=entity_context))
 
         # Append conversation history
         for msg in conversation_history:
             if msg["role"] == "user":
-                messages.append(HumanMessage(content=msg["content"]))
+                langchain_messages.append(HumanMessage(content=msg["content"]))
             elif msg["role"] == "assistant":
-                messages.append(AIMessage(content=msg["content"]))
+                langchain_messages.append(AIMessage(content=msg["content"]))
 
-        # If no history, start the conversation
+        # If no history, prompt bot to ask Question 1 (Education details)
         if not conversation_history:
-            messages.append(
+            langchain_messages.append(
                 HumanMessage(
-                    content="[System: The user just arrived at the onboarding page. "
-                    "Send your welcome message to start the conversation.]"
+                    content="[System: The user just arrived. Send your welcoming greeting and ask Question 1: Education details (degree, major/branch, graduation year) with tailored suggestion chips.]"
                 )
             )
 
-        # Invoke the LLM
-        response = await llm.ainvoke(messages)
-        response_text = response.content
-
-        # Parse the JSON response
+        # Invoke LLM directly with SystemMessage and conversation messages
+        response = await llm.ainvoke(langchain_messages)
         parser = JsonOutputParser()
-        parsed = parser.parse(response_text)
+        parsed = parser.parse(response.content)
 
-        # Merge entities
+        # Merge validated entities into JSON state
         llm_entities = parsed.get("extracted_entities", {})
         merged = _merge_entities(current_entities, llm_entities)
 
         # Recompute completed categories server-side for accuracy
         completed = _compute_completed_categories(merged)
-        is_complete = len(completed) >= 12 or parsed.get("is_profile_complete", False)
+        is_complete = len(completed) >= 15 or parsed.get("is_profile_complete", False)
 
         return {
             "assistant_message": parsed.get("assistant_message", ""),
             "quick_reply_chips": parsed.get("quick_reply_chips", []),
             "extracted_entities": merged,
             "completed_categories": completed,
-            "is_profile_complete": is_complete and len(completed) >= 12,
+            "is_profile_complete": is_complete,
         }
 
     except json.JSONDecodeError as e:
@@ -307,30 +345,30 @@ async def process_onboarding_turn(
 def _fallback_response(
     current_entities: dict[str, Any], error_type: str
 ) -> dict[str, Any]:
-    """Generate a graceful fallback response when LLM call fails."""
+    """Generate a graceful fallback response when LLM call encounters issues."""
     completed = _compute_completed_categories(current_entities)
     count = len(completed)
 
     if error_type == "parse_error":
         message = (
-            "I had a small hiccup processing that. Could you rephrase or tell me "
-            "more about your background? I'm tracking your profile across 15 categories."
+            "I had a small hiccup processing that. Could you please rephrase your answer? "
+            "I'm guiding you through the 15 profile diagnostic questions."
         )
     else:
         message = (
-            f"I've noted your preferences so far ({count}/15 categories captured). "
-            "You can continue chatting to fill more categories, or click "
-            "'Generate Roadmap' to finalize your profile."
+            f"I've recorded your details so far ({count}/15 categories captured). "
+            "Please answer the remaining profile questions or click 'Generate Roadmap' to finalize."
         )
 
     return {
         "assistant_message": message,
         "quick_reply_chips": [
-            "Tell me about my education and skills",
-            "I want to share my career goals",
+            "B.Tech CS (2025)",
+            "github.com/myusername",
+            "5-10 hours/week",
             "Generate My Roadmap Now 🚀",
         ],
         "extracted_entities": current_entities,
         "completed_categories": completed,
-        "is_profile_complete": count >= 12,
+        "is_profile_complete": count >= 15,
     }

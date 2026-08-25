@@ -43,6 +43,7 @@ async def save_profile(
     user_id: str,
     profile_metadata: dict[str, Any],
     completed_categories: list[str] | None = None,
+    access_token: str | None = None,
 ) -> dict[str, Any]:
     """
     Upsert the learner profile into the Supabase `profiles` table
@@ -59,6 +60,11 @@ async def save_profile(
     try:
         client = get_supabase_client()
 
+        # The request token gives PostgREST the auth.uid() required by the
+        # profiles RLS policies. A real service-role key also bypasses RLS.
+        if access_token:
+            client.postgrest.auth(access_token)
+
         # 1. Upsert into profiles table
         profile_data = {
             "user_id": user_id,
@@ -67,29 +73,35 @@ async def save_profile(
             "onboarding_completed": True,
         }
 
-        result = (
-            client.table("profiles")
-            .upsert(profile_data, on_conflict="user_id")
-            .execute()
-        )
+        try:
+            client.table("profiles").upsert(
+                profile_data, on_conflict="user_id"
+            ).execute()
+            logger.info("Successfully upserted profile into 'profiles' table for user %s", user_id)
+        except Exception as table_err:
+            logger.error("Failed to upsert into 'profiles' table: %s", table_err, exc_info=True)
+            return {
+                "success": False,
+                "message": f"Could not save profile to Supabase: {table_err}",
+            }
 
-        if not result.data:
-            logger.warning("Profile upsert returned no data for user %s", user_id)
+        # 2. Update users table onboarding_completed flag if available
+        try:
+            client.table("users").update(
+                {"onboarding_completed": True}
+            ).eq("id", user_id).execute()
+        except Exception as user_err:
+            logger.warning("Could not update 'users' table onboarding_completed flag: %s", user_err)
 
-        # 2. Update users table onboarding_completed flag
-        client.table("users").update(
-            {"onboarding_completed": True}
-        ).eq("id", user_id).execute()
-
-        logger.info("Profile saved successfully for user %s", user_id)
+        logger.info("Profile save completed for user %s", user_id)
         return {
             "success": True,
-            "message": "Profile saved and onboarding marked as complete.",
+            "message": "Profile saved and synced with Supabase.",
         }
 
     except Exception as e:
         logger.error("Failed to save profile for user %s: %s", user_id, e, exc_info=True)
         return {
             "success": False,
-            "message": f"Failed to save profile: {str(e)}",
+            "message": f"Could not save profile to Supabase: {str(e)}",
         }
