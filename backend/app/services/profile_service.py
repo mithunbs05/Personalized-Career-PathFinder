@@ -61,7 +61,7 @@ async def save_profile(
         client = get_supabase_client()
 
         # The request token gives PostgREST the auth.uid() required by the
-        # profiles RLS policies. A real service-role key also bypasses RLS.
+        # profiles RLS policies.
         if access_token:
             client.postgrest.auth(access_token)
 

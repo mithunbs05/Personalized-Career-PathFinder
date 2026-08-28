@@ -116,14 +116,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const saveOnboarding = async (profile: UserProfile) => {
-    setLoading(true);
-    try {
-      const result = await authService.saveOnboardingProfile(profile);
-      if (result.user) {
-        setUser(result.user);
-      }
-    } finally {
-      setLoading(false);
+    const result = await authService.saveOnboardingProfile(profile);
+    if (result.user) {
+      setUser(result.user);
     }
   };
 
