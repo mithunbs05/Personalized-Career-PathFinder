@@ -6,8 +6,8 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (credentials: RegisterCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<User>;
+  register: (credentials: RegisterCredentials) => Promise<User>;
   guestLogin: () => Promise<void>;
   logout: () => Promise<void>;
   saveOnboarding: (profile: UserProfile) => Promise<void>;
@@ -54,21 +54,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials): Promise<User> => {
     setLoading(true);
     try {
       const response = await authService.login(credentials);
       setUser(response.user);
+      return response.user;
+    } catch (err) {
+      setUser(null);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (credentials: RegisterCredentials) => {
+  const register = async (credentials: RegisterCredentials): Promise<User> => {
     setLoading(true);
     try {
       const response = await authService.register(credentials);
       setUser(response.user);
+      return response.user;
     } finally {
       setLoading(false);
     }

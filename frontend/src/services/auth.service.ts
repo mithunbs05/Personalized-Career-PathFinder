@@ -11,6 +11,9 @@ export const authService = {
     const password = credentials.password || '';
 
     // 1. Sign up with Supabase Auth (metadata stored in raw_user_meta_data)
+    let authUser: any = null;
+    let authSession: any = null;
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: trimmedEmail,
       password: password,
@@ -22,16 +25,39 @@ export const authService = {
     });
 
     if (authError) {
-      throw new Error(formatAuthError(authError));
+      // If user already exists in auth.users (e.g. deleted only from public.users table),
+      // sign in to link and restore the public.users profile
+      if (
+        authError.message.toLowerCase().includes('already registered') ||
+        authError.message.toLowerCase().includes('already exists') ||
+        authError.status === 422
+      ) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: password,
+        });
+
+        if (signInError || !signInData.user) {
+          throw new Error('An account with this email exists in authentication. Please use your existing password or reset it.');
+        }
+
+        authUser = signInData.user;
+        authSession = signInData.session;
+      } else {
+        throw new Error(formatAuthError(authError));
+      }
+    } else {
+      authUser = authData.user;
+      authSession = authData.session;
     }
 
-    if (!authData.user) {
+    if (!authUser) {
       throw new Error('Registration failed. Unable to create user account.');
     }
 
-    const userId = authData.user.id;
+    const userId = authUser.id;
 
-    // 2. Insert profile record into public.users
+    // 2. Insert fresh profile record into public.users
     try {
       const { error: profileError } = await supabase
         .from('users')
@@ -41,6 +67,7 @@ export const authService = {
               id: userId,
               name: trimmedName,
               email: trimmedEmail,
+              onboarding_completed: false,
             },
           ],
           { onConflict: 'id' }
@@ -49,6 +76,9 @@ export const authService = {
       if (profileError) {
         console.warn('Profile insertion notice (handled by DB trigger or RLS):', profileError.message);
       }
+
+      // Clear any prior stale onboarding profile row for this user
+      await supabase.from('profiles').delete().eq('user_id', userId);
     } catch (err) {
       console.warn('Direct profile insert error:', err);
     }
@@ -59,12 +89,12 @@ export const authService = {
       email: trimmedEmail,
       role: 'Learner',
       avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(trimmedEmail)}`,
-      createdAt: authData.user.created_at || new Date().toISOString(),
+      createdAt: authUser.created_at || new Date().toISOString(),
       onboardingCompleted: false,
     };
 
     localStorage.setItem('pathai_user', JSON.stringify(user));
-    return { user, session: authData.session };
+    return { user, session: authSession };
   },
 
   /**
@@ -81,7 +111,9 @@ export const authService = {
     });
 
     if (authError) {
-      throw new Error(formatAuthError(authError));
+      const err = new Error(formatAuthError(authError));
+      (err as any).code = 'USER_NOT_FOUND';
+      throw err;
     }
 
     if (!authData.user) {
@@ -91,50 +123,45 @@ export const authService = {
     const userId = authData.user.id;
 
     // 2. Load profile from public.users table
-    let { data: profileRow, error: profileError } = await supabase
+    const { data: profileRow } = await supabase
       .from('users')
-      .select('id, name, email, created_at')
+      .select('id, name, email, onboarding_completed, created_at')
       .eq('id', userId)
       .maybeSingle();
 
-    // If profile row doesn't exist in public.users yet, create it now that we have an active session
+    // If profile row does NOT exist in public.users (e.g. deleted from users table),
+    // do not auto-create: log out and throw USER_NOT_FOUND so frontend redirects to register
     if (!profileRow) {
-      const fallbackName =
-        authData.user.user_metadata?.name ||
-        authData.user.user_metadata?.full_name ||
-        trimmedEmail.split('@')[0];
+      await supabase.auth.signOut();
+      localStorage.removeItem('pathai_user');
+      localStorage.removeItem('pathai_access_token');
+      localStorage.removeItem('pathai_refresh_token');
 
-      const { data: newRow, error: insertError } = await supabase
-        .from('users')
-        .upsert(
-          [
-            {
-              id: userId,
-              name: fallbackName,
-              email: trimmedEmail,
-            },
-          ],
-          { onConflict: 'id' }
-        )
-        .select('id, name, email, created_at')
-        .maybeSingle();
-
-      if (!insertError && newRow) {
-        profileRow = newRow;
-      }
+      const notFoundErr = new Error('No user account found. Please create an account.');
+      (notFoundErr as any).code = 'USER_NOT_FOUND';
+      throw notFoundErr;
     }
 
-    const storedUser = this.getStoredUser();
+    // 3. Also check public.profiles table if user completed onboarding
+    const { data: onboardingProfileRow } = await supabase
+      .from('profiles')
+      .select('onboarding_completed, profile_metadata')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const isCompleted = Boolean(
+      profileRow.onboarding_completed || onboardingProfileRow?.onboarding_completed
+    );
 
     const user: User = {
       id: userId,
-      name: profileRow?.name || authData.user.user_metadata?.name || trimmedEmail.split('@')[0],
-      email: profileRow?.email || authData.user.email || trimmedEmail,
+      name: profileRow.name || authData.user.user_metadata?.name || trimmedEmail.split('@')[0],
+      email: profileRow.email || authData.user.email || trimmedEmail,
       role: 'Learner',
       avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(trimmedEmail)}`,
-      createdAt: profileRow?.created_at || authData.user.created_at || new Date().toISOString(),
-      onboardingCompleted: storedUser?.id === userId ? (storedUser.onboardingCompleted ?? true) : true,
-      profile: storedUser?.id === userId ? storedUser.profile : undefined,
+      createdAt: profileRow.created_at || authData.user.created_at || new Date().toISOString(),
+      onboardingCompleted: isCompleted,
+      profile: (onboardingProfileRow?.profile_metadata as UserProfile) || undefined,
     };
 
     localStorage.setItem('pathai_user', JSON.stringify(user));
@@ -171,51 +198,39 @@ export const authService = {
       const userId = authUser.id;
 
       // Load profile from public.users
-      let { data: profileRow } = await supabase
+      const { data: profileRow } = await supabase
         .from('users')
-        .select('id, name, email, created_at')
+        .select('id, name, email, onboarding_completed, created_at')
         .eq('id', userId)
         .maybeSingle();
 
-      // If profile row doesn't exist in public.users yet, ensure it is created
+      // If user was deleted from public.users, terminate session
       if (!profileRow) {
-        const fallbackName =
-          authUser.user_metadata?.name ||
-          authUser.user_metadata?.full_name ||
-          authUser.email?.split('@')[0] ||
-          'Learner';
-
-        const { data: newRow } = await supabase
-          .from('users')
-          .upsert(
-            [
-              {
-                id: userId,
-                name: fallbackName,
-                email: authUser.email || '',
-              },
-            ],
-            { onConflict: 'id' }
-          )
-          .select('id, name, email, created_at')
-          .maybeSingle();
-
-        if (newRow) {
-          profileRow = newRow;
-        }
+        await supabase.auth.signOut();
+        localStorage.removeItem('pathai_user');
+        return null;
       }
 
-      const storedUser = this.getStoredUser();
+      // Check public.profiles table
+      const { data: onboardingProfileRow } = await supabase
+        .from('profiles')
+        .select('onboarding_completed, profile_metadata')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const isCompleted = Boolean(
+        profileRow.onboarding_completed || onboardingProfileRow?.onboarding_completed
+      );
 
       const user: User = {
         id: userId,
-        name: profileRow?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
-        email: profileRow?.email || authUser.email || '',
+        name: profileRow.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
+        email: profileRow.email || authUser.email || '',
         role: 'Learner',
         avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(authUser.email || userId)}`,
-        createdAt: profileRow?.created_at || authUser.created_at,
-        onboardingCompleted: storedUser?.id === userId ? (storedUser.onboardingCompleted ?? true) : true,
-        profile: storedUser?.id === userId ? storedUser.profile : undefined,
+        createdAt: profileRow.created_at || authUser.created_at,
+        onboardingCompleted: isCompleted,
+        profile: (onboardingProfileRow?.profile_metadata as UserProfile) || undefined,
       };
 
       localStorage.setItem('pathai_user', JSON.stringify(user));
@@ -240,6 +255,17 @@ export const authService = {
       onboardingCompleted: true,
       profile,
     };
+
+    try {
+      if (currentUser?.id) {
+        await supabase
+          .from('users')
+          .update({ onboarding_completed: true })
+          .eq('id', currentUser.id);
+      }
+    } catch (e) {
+      console.warn('Failed to update onboarding_completed in users table:', e);
+    }
 
     localStorage.setItem('pathai_user', JSON.stringify(updatedUser));
 
