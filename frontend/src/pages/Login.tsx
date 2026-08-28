@@ -52,14 +52,40 @@ export const Login: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await login({
+      const loggedInUser = await login({
         email: email.trim(),
         password,
         rememberMe,
       });
-      navigate(from, { replace: true });
+
+      if (loggedInUser && !loggedInUser.onboardingCompleted) {
+        navigate('/onboarding', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid email or password. Please try again.');
+      console.warn('Login failure:', err);
+      const msg = (err?.message || '').toLowerCase();
+      const isNotFound =
+        err?.code === 'USER_NOT_FOUND' ||
+        msg.includes('not found') ||
+        msg.includes('no user') ||
+        msg.includes('create an account');
+
+      if (isNotFound) {
+        setErrorMessage('No active account found. Redirecting to Create Account...');
+        setTimeout(() => {
+          navigate('/register', {
+            replace: true,
+            state: {
+              email: email.trim(),
+              notice: 'No account found with this email. Please register to get started.',
+            },
+          });
+        }, 1000);
+      } else {
+        setErrorMessage(err?.message || 'Invalid email or password. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }

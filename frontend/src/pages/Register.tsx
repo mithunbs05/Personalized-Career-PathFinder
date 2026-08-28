@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Lock, Mail, User, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, User, Sparkles, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface FormErrors {
@@ -12,12 +12,17 @@ interface FormErrors {
 }
 
 export const Register: React.FC = () => {
+  const location = useLocation();
+  const initialEmail = location.state?.email || '';
+  const initialNotice = location.state?.notice || '';
+
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [generalError, setGeneralError] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState(initialNotice);
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -158,6 +163,14 @@ export const Register: React.FC = () => {
               </p>
             </div>
           </div>
+
+          {/* Notice Banner */}
+          {noticeMessage && !generalError && !successMessage && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center gap-2">
+              <Info className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>{noticeMessage}</span>
+            </div>
+          )}
 
           {/* General Error Banner */}
           {generalError && (
