@@ -131,7 +131,7 @@ export const Onboarding: React.FC = () => {
 
       {/* Main Container */}
       <div className="max-w-4xl w-full mx-auto my-6">
-        {isProcessing ? (
+        <div className={isProcessing ? 'block' : 'hidden'}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -149,10 +149,6 @@ export const Onboarding: React.FC = () => {
                 {processingPhase === 4 ? 'Profile Complete & Roadmap Ready!' : 'Synthesizing All 15 Onboarding Categories...'}
               </h2>
             </div>
-
-            {saveError && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">{saveError}</p>
-            )}
 
             <div className="max-w-md mx-auto space-y-3 text-left text-xs font-semibold">
               <div className={`p-3 rounded-xl flex items-center gap-3 transition-all ${processingPhase >= 1 ? 'bg-[#F1EFE7] dark:bg-[#252522] text-[#1A1A1A] dark:text-white' : 'text-[#7A8B7C]/50'}`}>
@@ -176,12 +172,27 @@ export const Onboarding: React.FC = () => {
               </div>
             </div>
           </motion.div>
-        ) : (
+        </div>
+
+        {saveError && (
+          <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center">
+            <p className="font-bold">Error saving profile:</p>
+            <p>{saveError}</p>
+            <button 
+              onClick={() => setSaveError(null)}
+              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <div className={!isProcessing ? 'block' : 'hidden'}>
           <NlpOnboardingBot
             onComplete={handleComplete}
             isSubmitting={isProcessing}
           />
-        )}
+        </div>
       </div>
 
       <div className="max-w-4xl w-full mx-auto text-center text-xs text-[#7A8B7C] pt-4 border-t border-[#E8E6DE] dark:border-[#2C2C29]">

@@ -204,11 +204,31 @@ export const authService = {
         .eq('id', userId)
         .maybeSingle();
 
-      // If user was deleted from public.users, terminate session
+      // If user was missing from public.users, auto-recreate instead of signing out
+      let finalProfileRow = profileRow;
       if (!profileRow) {
-        await supabase.auth.signOut();
-        localStorage.removeItem('pathai_user');
-        return null;
+        console.warn('Profile row missing in public.users. Auto-recreating...');
+        const { data: newRow, error: insertError } = await supabase
+          .from('users')
+          .upsert(
+            [
+              {
+                id: userId,
+                name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
+                email: authUser.email,
+                onboarding_completed: false,
+              },
+            ],
+            { onConflict: 'id' }
+          )
+          .select('id, name, email, onboarding_completed, created_at')
+          .maybeSingle();
+          
+        if (insertError) {
+          console.error('Failed to auto-recreate profile row:', insertError);
+        } else {
+          finalProfileRow = newRow;
+        }
       }
 
       // Check public.profiles table
@@ -219,16 +239,16 @@ export const authService = {
         .maybeSingle();
 
       const isCompleted = Boolean(
-        profileRow.onboarding_completed || onboardingProfileRow?.onboarding_completed
+        finalProfileRow?.onboarding_completed || onboardingProfileRow?.onboarding_completed
       );
 
       const user: User = {
         id: userId,
-        name: profileRow.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
-        email: profileRow.email || authUser.email || '',
+        name: finalProfileRow?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
+        email: finalProfileRow?.email || authUser.email || '',
         role: 'Learner',
         avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(authUser.email || userId)}`,
-        createdAt: profileRow.created_at || authUser.created_at,
+        createdAt: finalProfileRow?.created_at || authUser.created_at,
         onboardingCompleted: isCompleted,
         profile: (onboardingProfileRow?.profile_metadata as UserProfile) || undefined,
       };
