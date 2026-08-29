@@ -10,6 +10,8 @@ import { TransformerHeader } from './TransformerHeader';
 import { VideoCourseMode } from './VideoCourseMode';
 import { CodingChallengeMode } from './CodingChallengeMode';
 import { TransformationLoader } from './TransformationLoader';
+import { useModuleProgress } from '../../hooks/useModuleProgress';
+import { transformModule } from '../../api/modules.api';
 
 interface MultiModalTransformerProps {
   initialStageId?: number;
@@ -25,15 +27,28 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
   const [isTransforming, setIsTransforming] = useState(false);
   const [transformFrom, setTransformFrom] = useState<LearningMode>('video');
 
-  const [moduleProgressMap, setModuleProgressMap] = useState<Record<string, LearnerProgress>>(() => {
-    const initialMap: Record<string, LearnerProgress> = {};
-    TRANSFORMER_MODULES.forEach((mod) => {
-      initialMap[mod.id] = createInitialProgress(mod);
-    });
-    return initialMap;
-  });
+  // Real backend progress synchronization hook
+  const { progress: backendProg, updateVideoTime, refetch: refetchProgress } = useModuleProgress(currentModule.id);
 
-  const currentProgress = moduleProgressMap[currentModule.id] || createInitialProgress(currentModule);
+  // Local state initialized and synced with real backend data
+  const [localProgress, setLocalProgress] = useState<LearnerProgress>(() => createInitialProgress(initialModule));
+
+  useEffect(() => {
+    if (backendProg) {
+      setLocalProgress((prev) => ({
+        ...prev,
+        conceptScore: backendProg.concept || prev.conceptScore,
+        practiceScore: backendProg.practice?.passed
+          ? Math.round((backendProg.practice.passed / (backendProg.practice.total || 5)) * 100)
+          : prev.practiceScore,
+        testsPassed: backendProg.practice?.passed ?? prev.testsPassed,
+        totalTests: backendProg.practice?.total ?? prev.totalTests,
+        masteryLevel: (backendProg.mastery as any) || prev.masteryLevel,
+        videoTimePosition: backendProg.videoCurrentTime ?? prev.videoTimePosition,
+        writtenCode: backendProg.savedDraftCode || prev.writtenCode
+      }));
+    }
+  }, [backendProg]);
 
   useEffect(() => {
     if (initialStageId) {
@@ -45,48 +60,40 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
   }, [initialStageId]);
 
   const handleUpdateProgress = (update: Partial<LearnerProgress>) => {
-    setModuleProgressMap((prev) => ({
+    setLocalProgress((prev) => ({
       ...prev,
-      [currentModule.id]: {
-        ...currentProgress,
-        ...update
-      }
+      ...update
     }));
+
+    if (update.videoTimePosition !== undefined) {
+      updateVideoTime(update.videoTimePosition, 720, (update.videoTimePosition >= 710));
+    }
   };
 
-  const handleToggleMode = (targetMode: LearningMode) => {
+  const handleToggleMode = async (targetMode: LearningMode) => {
     if (targetMode === currentMode || isTransforming) return;
 
     setTransformFrom(currentMode);
     setIsTransforming(true);
 
     if (targetMode === 'coding') {
-      fetch('/api/transformer/transform-lesson', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          moduleTitle: currentModule.title,
-          objectives: currentModule.objectives,
-          keyTakeaways: currentModule.keyTakeaways,
-          difficulty: currentProgress.currentDifficulty || currentModule.challenge.difficulty,
-          currentTranscript: currentModule.chapters[currentProgress.currentChapterIndex]?.transcript
-        })
-      }).catch((err) => console.warn('Transform endpoint background notice:', err));
+      try {
+        await transformModule(currentModule.id);
+      } catch (err) {
+        console.warn('Transform endpoint background execution:', err);
+      }
     }
 
     setTimeout(() => {
       setCurrentMode(targetMode);
       setIsTransforming(false);
       handleUpdateProgress({ lastMode: targetMode });
-    }, 1800);
+      refetchProgress();
+    }, 1200);
   };
 
   const handleSelectModule = (mod: TransformerModule) => {
     setCurrentModule(mod);
-    const saved = moduleProgressMap[mod.id];
-    if (saved?.lastMode) {
-      setCurrentMode(saved.lastMode);
-    }
   };
 
   return (
@@ -100,13 +107,13 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
         />
       )}
 
-      {/* Header matching exact layout in user screenshot */}
+      {/* Header matching exact minimal layout */}
       <TransformerHeader
         currentModule={currentModule}
         onSelectModule={handleSelectModule}
         currentMode={currentMode}
         onToggleMode={handleToggleMode}
-        progress={currentProgress}
+        progress={localProgress}
         isTransforming={isTransforming}
       />
 
@@ -115,14 +122,14 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
         {currentMode === 'video' ? (
           <VideoCourseMode
             module={currentModule}
-            progress={currentProgress}
+            progress={localProgress}
             onProgressUpdate={handleUpdateProgress}
             onSwitchToCoding={() => handleToggleMode('coding')}
           />
         ) : (
           <CodingChallengeMode
             module={currentModule}
-            progress={currentProgress}
+            progress={localProgress}
             onProgressUpdate={handleUpdateProgress}
             onSwitchToVideo={() => handleToggleMode('video')}
           />

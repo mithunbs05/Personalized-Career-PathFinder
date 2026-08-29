@@ -5,6 +5,10 @@ import bcrypt from "bcryptjs";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import moduleRoutes from "./server/routes/module.routes";
+import challengeRoutes from "./server/routes/challenge.routes";
+import codeRoutes from "./server/routes/code.routes";
+import aiRoutes from "./server/routes/ai.routes";
 
 dotenv.config();
 
@@ -14,6 +18,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "pathai-super-secure-secret-key-202
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "pathai-refresh-token-secret-2026";
 
 app.use(express.json());
+
+// Mount Content Transformer Modular REST API Endpoints
+app.use("/api/modules", moduleRoutes);
+app.use("/api/challenges", challengeRoutes);
+app.use("/api/code", codeRoutes);
+app.use("/api/ai", aiRoutes);
+
 
 // In-memory data store for users & roadmaps
 interface DbUser {
