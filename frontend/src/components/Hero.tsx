@@ -92,7 +92,7 @@ export const Hero: React.FC = () => {
         >
           {/* Main Headline */}
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight mb-6 text-[#1A1A1A] dark:text-white">
-            Stop Guessing <span className="font-editorial italic text-[#4A4A4A]/80 dark:text-[#A0A09B]/80 block sm:inline">What to Learn Next.</span>
+            Stop Guessing <span className="font-editorial italic text-stone-400 dark:text-stone-400 font-normal block sm:inline">What to Learn Next.</span>
           </h1>
 
           {/* Subtitle / Description */}

@@ -62,7 +62,7 @@ export const FeaturesSection: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-4xl sm:text-5xl font-bold leading-tight text-[#1A1A1A] dark:text-white"
           >
-            Everything you need to reach <span className="font-editorial italic text-[#4A4A4A]/80 dark:text-[#A0A09B]/80 block sm:inline">the hiring bar.</span>
+            Everything you need to reach <span className="font-editorial italic text-stone-400 dark:text-stone-400 font-normal block sm:inline">the hiring bar.</span>
           </motion.h2>
         </div>
 

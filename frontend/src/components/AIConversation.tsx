@@ -84,7 +84,7 @@ export const AIConversation: React.FC = () => {
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-[#1A1A1A] dark:text-white tracking-tight">
             Don't know what to learn next?{' '}
-            <span className="font-editorial italic font-normal text-[#4A4A4A] dark:text-[#A0A09B]">
+            <span className="font-editorial italic font-normal text-stone-400 dark:text-stone-400">
               Ask.
             </span>
           </h2>
