@@ -70,7 +70,7 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
       {/* Drawer Header */}
       <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
         <div className="flex flex-wrap items-center gap-2 mb-2">
-           <span className="text-[10px] font-extrabold text-[#ea580c] tracking-wider uppercase bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-extrabold text-[#ea580c] tracking-wider uppercase bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded-full">
             {stage.isFinalCapstone ? 'FINAL CAPSTONE' : `STAGE ${stage.id}`}
           </span>
           <span className="px-2 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full">
@@ -86,7 +86,7 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-6">
-        
+
         {/* Prerequisite Alert */}
         {stage.status === 'LOCKED' && stage.prerequisites.length > 0 && (
           <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
@@ -149,29 +149,29 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
 
         {/* Final Capstone specific view */}
         {stage.isFinalCapstone && (
-           <div className="p-4 rounded-xl bg-slate-900 text-white space-y-3 shadow-lg shadow-slate-900/20">
-             <div className="flex items-center gap-2 text-[#ea580c] font-bold text-sm">
-               <BrainCircuit className="w-5 h-5" />
-               Capstone Requirements
-             </div>
-             <p className="text-xs text-slate-300 leading-relaxed">{stage.project}</p>
-             <div className="pt-3 mt-3 border-t border-slate-700/50">
-               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Outcome Summary</div>
-               <ul className="space-y-1.5 text-xs text-slate-200">
-                 <li className="flex items-center gap-2"><Check className="w-3 h-3 text-emerald-400" /> End-to-end System Design</li>
-                 <li className="flex items-center gap-2"><Check className="w-3 h-3 text-emerald-400" /> Production Deployment</li>
-                 <li className="flex items-center gap-2"><Check className="w-3 h-3 text-[#ea580c]" /> 🎯 PathAI Certified: AI/ML Engineer Ready</li>
-               </ul>
-             </div>
-           </div>
+          <div className="p-4 rounded-xl bg-slate-900 text-white space-y-3 shadow-lg shadow-slate-900/20">
+            <div className="flex items-center gap-2 text-[#ea580c] font-bold text-sm">
+              <BrainCircuit className="w-5 h-5" />
+              Capstone Requirements
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">{stage.project}</p>
+            <div className="pt-3 mt-3 border-t border-slate-700/50">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Outcome Summary</div>
+              <ul className="space-y-1.5 text-xs text-slate-200">
+                <li className="flex items-center gap-2"><Check className="w-3 h-3 text-emerald-400" /> End-to-end System Design</li>
+                <li className="flex items-center gap-2"><Check className="w-3 h-3 text-emerald-400" /> Production Deployment</li>
+                <li className="flex items-center gap-2"><Check className="w-3 h-3 text-[#ea580c]" /> 🎯 PathAI Certified: AI/ML Engineer Ready</li>
+              </ul>
+            </div>
+          </div>
         )}
       </div>
-      
+
       {/* Sticky Bottom Actions & AI Chat */}
       <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         {/* Primary CTA */}
         <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-          <button 
+          <button
             disabled={stage.status === 'LOCKED'}
             className="w-full py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-bold text-sm shadow-md shadow-[#ea580c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -185,7 +185,7 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
             <Bot className="w-4 h-4 text-[#ea580c]" />
             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">AI Learning Mentor</span>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
             {chatMessages.map((msg, idx) => (
               <div key={idx} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
@@ -210,7 +210,7 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
 
           <div className="px-3 pb-2 flex gap-1.5 overflow-x-auto no-scrollbar">
             {quickPrompts.map((prompt, idx) => (
-              <button 
+              <button
                 key={idx}
                 onClick={() => setChatInput(prompt)}
                 className="whitespace-nowrap px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-[10px] font-medium text-slate-600 dark:text-slate-400 hover:border-[#ea580c] dark:hover:border-[#ea580c] hover:text-[#ea580c] dark:hover:text-[#ea580c] transition-colors"

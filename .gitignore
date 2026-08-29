@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+backend/.venv/
+backend/venv/
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.env
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+
+# Temp & Scratch files
+test_*.js
+test_*.mjs
+test_*.py
+scratch/
