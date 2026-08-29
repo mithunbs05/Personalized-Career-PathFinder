@@ -49,11 +49,11 @@ export const ProblemSection: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-4xl sm:text-5xl font-bold leading-tight text-[#1A1A1A] dark:text-white"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#1A1A1A] dark:text-white leading-[1.15]"
           >
-            The problem isn't finding courses.{' '}
-            <span className="font-editorial italic text-[#4A4A4A]/80 dark:text-[#A0A09B]/80 block">
-              It's knowing which one comes next.
+            Why standard courses{' '}
+            <span className="font-editorial italic text-stone-400 dark:text-stone-400 font-normal block">
+              leave you stuck in tutorial limbo.
             </span>
           </motion.h2>
         </div>

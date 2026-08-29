@@ -4,7 +4,6 @@ import { Hero } from '../components/Hero';
 import { ProblemSection } from '../components/ProblemSection';
 import { HowItWorks } from '../components/HowItWorks';
 import { RoadmapPreview } from '../components/RoadmapPreview';
-import { PersonalizationDemo } from '../components/PersonalizationDemo';
 import { FeaturesSection } from '../components/FeaturesSection';
 import { FinalCTA } from '../components/FinalCTA';
 import { Footer } from '../components/Footer';
@@ -24,7 +23,6 @@ export const Landing: React.FC = () => {
           <ProblemSection />
           <HowItWorks />
           <RoadmapPreview />
-          <PersonalizationDemo />
           <FeaturesSection />
           <FinalCTA />
         </main>

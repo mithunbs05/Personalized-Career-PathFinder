@@ -95,7 +95,7 @@ export const RoadmapPreview: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-4xl sm:text-5xl font-bold leading-tight text-[#1A1A1A] dark:text-white mb-6"
           >
-            A path built for <span className="text-[#FF4D31]">production</span>, not just tutorials.
+            A path built for <span className="text-stone-400 dark:text-stone-400 font-editorial italic font-normal">production</span>, not just tutorials.
           </motion.h2>
           
           <motion.p
