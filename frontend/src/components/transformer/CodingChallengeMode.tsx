@@ -178,6 +178,19 @@ export const CodingChallengeMode: React.FC<CodingChallengeModeProps> = ({
     setSearchQuery('');
   };
 
+  if (isChallengeLoading || !challenge) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-2xl p-12 text-center space-y-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[#FF5A3D] border-t-transparent animate-spin mx-auto"></div>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Loading challenge from backend...
+        </p>
+      </div>
+    );
+  }
+
+  const activeTestCase = challenge.testCases[activeTestCaseIdx] || challenge.testCases[0];
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       

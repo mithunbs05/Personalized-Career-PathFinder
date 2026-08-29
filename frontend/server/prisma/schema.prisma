@@ -1,0 +1,267 @@
+// Prisma Schema for PathAI Multi-Modal Content Transformer
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Difficulty {
+  BEGINNER
+  GUIDED
+  STANDARD
+  ADVANCED
+}
+
+enum LearningModeType {
+  VIDEO
+  CODING
+}
+
+enum MasteryLevel {
+  BEGINNER
+  DEVELOPING
+  PROFICIENT
+  MASTERED
+}
+
+enum AttemptStatus {
+  PASSED
+  FAILED
+  PARTIAL
+  ERROR
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  name                String
+  learningProgresses  LearningProgress[]
+  challengeAttempts   ChallengeAttempt[]
+  codeExecutions      CodeExecution[]
+  conceptMasteries    ConceptMastery[]
+  aiInsights          AIInsight[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Course {
+  id                  String               @id @default(uuid())
+  title               String
+  description         String
+  modules             Module[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Module {
+  id                  String               @id @default(uuid())
+  courseId            String
+  course              Course               @relation(fields: [courseId], references: [id])
+  title               String
+  description         String
+  category            String               // e.g. "Core Python"
+  duration            Int                  // duration in minutes
+  difficulty          Difficulty           @default(STANDARD)
+  learningObjectives  String[]
+  concepts            String[]
+  videoUrl            String?
+  thumbnailUrl        String?
+  lessons             Lesson[]
+  transcripts         LessonTranscript[]
+  codingChallenges    CodingChallenge[]
+  learningProgresses  LearningProgress[]
+  conceptMasteries    ConceptMastery[]
+  aiInsights          AIInsight[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([courseId])
+}
+
+model Lesson {
+  id                  String               @id @default(uuid())
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  title               String
+  description         String?
+  order               Int
+  duration            Int                  // in seconds
+  videoTimestamp      Int                  // start second
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([moduleId])
+}
+
+model LessonTranscript {
+  id                  String               @id @default(uuid())
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  timestamp           String               // e.g. "00:15"
+  seconds             Int                  // e.g. 15
+  content             String
+  concept             String
+  order               Int
+  createdAt           DateTime             @default(now())
+
+  @@index([moduleId, order])
+}
+
+model CodingChallenge {
+  id                  String               @id @default(uuid())
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  title               String
+  description         String
+  language            String               @default("python")
+  difficulty          Difficulty           @default(STANDARD)
+  starterCode         String
+  solutionCode        String?
+  instructions        String[]
+  constraints         String[]
+  examples            Json                 // array of { input, output, explanation }
+  hints               String[]
+  testCases           ChallengeTestCase[]
+  attempts            ChallengeAttempt[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([moduleId])
+}
+
+model ChallengeTestCase {
+  id                  String               @id @default(uuid())
+  challengeId         String
+  challenge           CodingChallenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  input               String
+  expectedOutput      String
+  description         String
+  isHidden            Boolean              @default(false)
+  order               Int
+  createdAt           DateTime             @default(now())
+
+  @@index([challengeId])
+}
+
+model ChallengeAttempt {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  challengeId         String
+  challenge           CodingChallenge      @relation(fields: [challengeId], references: [id])
+  code                String
+  language            String               @default("python")
+  passedCount         Int
+  totalCount          Int
+  score               Int                  // 0 - 100
+  status              AttemptStatus
+  executionTimeMs     Int
+  feedbackSummary     String?
+  feedbackDetails     Json?                // { whatWentWrong, whyItWentWrong, conceptReminder, socraticHint, suggestedNextStep }
+  createdAt           DateTime             @default(now())
+
+  @@index([userId, challengeId])
+  @@index([createdAt])
+}
+
+model CodeExecution {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  code                String
+  language            String               @default("python")
+  output              String?
+  error               String?
+  executionTimeMs     Int
+  isSuccess           Boolean
+  createdAt           DateTime             @default(now())
+
+  @@index([userId])
+}
+
+model LearningProgress {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  activeMode          LearningModeType     @default(VIDEO)
+  videoCurrentTime    Int                  @default(0)     // in seconds
+  videoDuration       Int                  @default(720)   // in seconds
+  videoCompleted      Boolean              @default(false)
+  conceptScore        Int                  @default(0)     // 0 - 100
+  practiceScore       Int                  @default(0)     // 0 - 100
+  testsPassed         Int                  @default(0)
+  totalTests          Int                  @default(5)
+  hintsUsed           Int                  @default(0)
+  attemptCount        Int                  @default(0)
+  overallProgress     Int                  @default(0)     // weighted 0 - 100
+  masteryLevel        MasteryLevel         @default(BEGINNER)
+  savedDraftCode      String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+}
+
+model ConceptMastery {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  conceptName         String
+  understandingScore  Int                  @default(0)     // 0 - 100
+  accuracyScore       Int                  @default(0)     // 0 - 100
+  masteryLevel        MasteryLevel         @default(BEGINNER)
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([userId, moduleId, conceptName])
+}
+
+model AIInsight {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  insightText         String
+  recommendedAction   String
+  triggerReason       String?
+  createdAt           DateTime             @default(now())
+
+  @@index([userId, moduleId])
+}
+
+model YouTubeVideo {
+  id                  String               @id @default(uuid())
+  moduleId            String
+  module              Module               @relation(fields: [moduleId], references: [id])
+  videoId             String
+  title               String
+  description         String
+  thumbnailUrl        String
+  channelId           String
+  channelTitle        String
+  duration            String               // ISO 8601 or MM:SS
+  durationSeconds     Int                  @default(0)
+  viewCount           Int                  @default(0)
+  likeCount           Int                  @default(0)
+  publishedAt         DateTime
+  qualityScore        Int                  @default(0) // 0 - 100
+  relevanceScore      Int                  @default(0) // 0 - 100
+  selected            Boolean              @default(true)
+  lastFetchedAt       DateTime             @default(now())
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([moduleId, videoId])
+  @@index([moduleId])
+}
+
