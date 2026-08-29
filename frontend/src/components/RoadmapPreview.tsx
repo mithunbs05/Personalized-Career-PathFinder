@@ -16,29 +16,27 @@ interface VisualNode {
   isMilestone?: boolean;
 }
 
-const ROADMAP_STEPS: VisualNode[] = [
+const ROADMAP_NODES = [
   {
-    id: 'step-py',
+    id: 1,
     title: 'Python for High-Performance Systems',
-    category: 'Stage 1: Core Engineering',
+    description: 'Master advanced Python constructs required for AI infrastructure.',
+    capstone: 'Async Distributed Task Queue',
+    skills: ['Asyncio', 'Multiprocessing', 'Type Annotations', 'Memory Profiling'],
     status: 'completed',
-    weeks: '2 weeks',
-    summary: 'Memory optimization, vector math with NumPy/C extensions, and asyncio task loops.',
-    skills: ['Python 3.12', 'NumPy', 'AsyncIO', 'Memory Profiling'],
-    deliverable: 'Vectorized Mathematical Engine',
+    icon: <Code2 className="w-5 h-5" />
   },
   {
-    id: 'step-ml',
+    id: 2,
     title: 'Applied Machine Learning & Evaluation',
-    category: 'Stage 1: Statistical AI',
+    description: 'Build intuition for classical ML pipelines and robust evaluation.',
+    capstone: 'End-to-End Evaluation Suite',
+    skills: ['Scikit-Learn', 'Cross-Validation', 'Metrics', 'Feature Engineering'],
     status: 'completed',
-    weeks: '3 weeks',
-    summary: 'Loss functions, gradient descent mechanics, cross-validation, and tabular pipelines.',
-    skills: ['Scikit-Learn', 'Feature Stores', 'Loss Optimization', 'XGBoost'],
-    deliverable: 'Production Churn Predictor',
+    icon: <Target className="w-5 h-5" />
   },
   {
-    id: 'step-dl',
+    id: 3,
     title: 'Deep Learning & Neural Architectures',
     category: 'Stage 2: Modern Neural Networks',
     status: 'current',
@@ -49,17 +47,16 @@ const ROADMAP_STEPS: VisualNode[] = [
     isMilestone: true,
   },
   {
-    id: 'step-llm',
+    id: 4,
     title: 'LLM Fundamentals & Attention Layers',
-    category: 'Stage 2: Transformer Architectures',
-    status: 'next',
-    weeks: '2 weeks',
-    summary: 'Multi-head self-attention, positional encoding, KV caching, tokenization algorithms.',
-    skills: ['Transformers', 'Self-Attention', 'Tokenizers', 'HuggingFace'],
-    deliverable: 'Micro-GPT Built from Scratch',
+    description: 'Deconstruct transformer architecture from the ground up.',
+    capstone: 'Micro-GPT from Scratch',
+    skills: ['Transformers', 'Self-Attention', 'Tokenization', 'Positional Encoding'],
+    status: 'locked',
+    icon: <Map className="w-5 h-5" />
   },
   {
-    id: 'step-rag',
+    id: 5,
     title: 'Enterprise RAG & Hybrid Vector Retrieval',
     category: 'Stage 3: Information Retrieval',
     status: 'recommended',
@@ -70,7 +67,7 @@ const ROADMAP_STEPS: VisualNode[] = [
     isMilestone: true,
   },
   {
-    id: 'step-agents',
+    id: 6,
     title: 'Autonomous AI Agents & Tool Calling',
     category: 'Stage 3: Agentic Workflows',
     status: 'recommended',
@@ -83,12 +80,13 @@ const ROADMAP_STEPS: VisualNode[] = [
 ];
 
 export const RoadmapPreview: React.FC = () => {
-  const [selectedNode, setSelectedNode] = useState<VisualNode>(ROADMAP_STEPS[2]);
+  const [activeNode, setActiveNode] = useState(ROADMAP_NODES[2]);
 
   return (
     <section id="how-it-works" className="py-24 md:py-32 bg-transparent transition-colors duration-300 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+        
+        {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F1EFE7] dark:bg-[#252522] rounded-full text-[10px] font-bold tracking-widest text-[#7A8B7C] uppercase mb-4">
             ADAPTIVE CURRICULUM ARCHITECTURE
@@ -211,6 +209,7 @@ export const RoadmapPreview: React.FC = () => {
               </div>
             </TiltCard>
           </div>
+          
         </div>
       </div>
     </section>

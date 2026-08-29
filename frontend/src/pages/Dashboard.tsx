@@ -1345,3 +1345,5 @@ print("Output shape:", output.shape)`}
     </div>
   );
 };
+
+export default Dashboard;

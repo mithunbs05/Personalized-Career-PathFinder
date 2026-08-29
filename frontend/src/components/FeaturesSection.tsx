@@ -5,11 +5,9 @@ import { TiltCard } from './3d/TiltCard';
 
 const FEATURES = [
   {
-    icon: Bot,
+    icon: <MessageSquare className="w-6 h-6 text-[#FF4D31]" />,
     title: 'AI Learning Assistant',
-    description: 'Ask deep technical questions, debug architecture decisions, and receive context-aware guidance tailored to your exact roadmap position.',
-    tag: 'INTELLIGENCE',
-    color: '#FF4D31',
+    description: 'Context-aware technical mentoring that unsticks you immediately when you hit a wall, referencing your exact codebase and progress state.',
   },
   {
     icon: Route,
@@ -19,28 +17,22 @@ const FEATURES = [
     color: '#7A8B7C',
   },
   {
-    icon: GitCompare,
+    icon: <Activity className="w-6 h-6 text-[#FF4D31]" />,
     title: 'Skill Gap Analysis',
-    description: 'Understand precisely what competencies and sub-skills you are missing relative to real-world job specifications and hiring bars.',
-    tag: 'DIAGNOSTICS',
-    color: '#FF4D31',
+    description: 'Hiring bar discrepancy detection mapping your current knowledge against production-grade enterprise requirements.',
   },
   {
-    icon: Sparkles,
+    icon: <RefreshCcw className="w-6 h-6 text-[#7A8B7C]" />,
     title: 'Adaptive Recommendations',
-    description: 'Your roadmap is alive. It re-calibrates weekly based on quiz scores, completed GitHub repositories, and speed of mastery.',
-    tag: 'RE-ROUTING',
-    color: '#7A8B7C',
+    description: 'Continuous weekly recalibration of your syllabus based on your learning velocity and diagnostic results.',
   },
   {
-    icon: FolderGit2,
+    icon: <Briefcase className="w-6 h-6 text-[#FF4D31]" />,
     title: 'Project-Based Learning',
-    description: 'Build real production microservices, autonomous agents, and RAG pipelines that demonstrate proven hiring capability.',
-    tag: 'PORTFOLIO',
-    color: '#FF4D31',
+    description: 'Every milestone culminates in production-grade portfolio artifacts, ditching isolated tutorials for real-world engineering.',
   },
   {
-    icon: BarChart3,
+    icon: <BarChart2 className="w-6 h-6 text-[#7A8B7C]" />,
     title: 'Progress Intelligence',
     description: 'Track granular skill proficiencies, time invested, streak consistency, and milestone benchmarks with high-fidelity 3D telemetry.',
     tag: 'ANALYTICS',
@@ -104,6 +96,7 @@ export const FeaturesSection: React.FC = () => {
             );
           })}
         </div>
+        
       </div>
     </section>
   );

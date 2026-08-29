@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { TiltCard } from './3d/TiltCard';
 
 export const FinalCTA: React.FC = () => {
-  const [goalInput, setGoalInput] = useState('');
+  const [goal, setGoal] = useState('');
   const navigate = useNavigate();
 
-  const handleStartWithGoal = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (goalInput.trim()) {
-      localStorage.setItem('pathai_initial_goal', goalInput.trim());
+    if (goal.trim()) {
+      localStorage.setItem('pathai_initial_goal', goal.trim());
     }
     navigate('/register');
   };
@@ -23,8 +23,8 @@ export const FinalCTA: React.FC = () => {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
@@ -32,10 +32,10 @@ export const FinalCTA: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-[#FF4D31]" />
             <span>START YOUR JOURNEY</span>
           </div>
-
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-display font-extrabold text-[#1A1A1A] dark:text-white tracking-tight leading-[1.1] mb-6">
+          
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.1] tracking-tight mb-8 text-[#1A1A1A] dark:text-white">
             Your goal is unique.{' '}
-            <span className="block font-editorial italic font-normal text-[#4A4A4A] dark:text-[#A0A09B] mt-2">
+            <span className="font-editorial italic text-[#4A4A4A] dark:text-[#A0A09B] block mt-2">
               Your learning path should be too.
             </span>
           </h2>
@@ -80,7 +80,7 @@ export const FinalCTA: React.FC = () => {
             >
               Sign In
             </Link>
-          </div>
+          </p>
         </motion.div>
       </div>
     </section>

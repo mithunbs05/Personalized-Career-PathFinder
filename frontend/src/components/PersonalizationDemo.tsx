@@ -4,8 +4,22 @@ import { AlertCircle, CheckCircle2, Zap, ShieldCheck } from 'lucide-react';
 import { TiltCard } from './3d/TiltCard';
 
 export const PersonalizationDemo: React.FC = () => {
-  const [assessmentScore, setAssessmentScore] = useState(62);
-  const [completedFastAPI, setCompletedFastAPI] = useState(false);
+  const [assessmentScore, setAssessmentScore] = useState<number | null>(null);
+  const [labCompleted, setLabCompleted] = useState(false);
+
+  // States:
+  // 1. Initial (null score)
+  // 2. High Score (94%) -> Skips lab, unlocks outcome
+  // 3. Low Score (62%) -> Detects gap, shows lab
+  // 4. Low Score + Lab Completed -> Unlocks outcome
+
+  const isGapDetected = assessmentScore === 62;
+  const isOutcomeUnlocked = assessmentScore === 94 || labCompleted;
+
+  const handleScoreSelect = (score: number) => {
+    setAssessmentScore(score);
+    setLabCompleted(false); // Reset lab on new score
+  };
 
   return (
     <section id="learning-paths" className="py-24 md:py-32 bg-transparent border-y border-[#E8E6DE]/60 dark:border-[#2C2C29]/60 transition-colors duration-300 relative overflow-hidden">

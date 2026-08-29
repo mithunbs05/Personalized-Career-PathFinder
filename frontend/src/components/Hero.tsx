@@ -224,7 +224,7 @@ export const Hero: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           className="flex flex-col items-center max-w-4xl"
         >
           {/* Top 3D Spatial Tag */}
@@ -282,11 +282,12 @@ export const Hero: React.FC = () => {
             className="flex items-center justify-center gap-6 sm:gap-14 mb-12 w-full max-w-2xl p-4 rounded-3xl bg-white/70 dark:bg-[#1A1A18]/70 backdrop-blur-md border border-[#E8E6DE] dark:border-[#2C2C29] shadow-sm"
           >
             <AnimatedCounter target={14} suffix="K+" label="Active Learners" delay={200} />
-            <div className="w-px h-10 bg-[#E8E6DE] dark:bg-[#2C2C29]" />
+            <div className="w-px h-12 bg-[#E8E6DE] dark:bg-[#2C2C29]" />
             <AnimatedCounter target={96} suffix="%" label="Goal Match Rate" delay={400} />
-            <div className="w-px h-10 bg-[#E8E6DE] dark:bg-[#2C2C29]" />
-            <AnimatedCounter target={3} suffix="x" label="Faster Mastery" delay={600} />
+            <div className="w-px h-12 bg-[#E8E6DE] dark:bg-[#2C2C29]" />
+            <AnimatedCounter target={3} suffix="X" label="Faster Mastery" delay={600} />
           </motion.div>
+        </motion.div>
 
           {/* REDESIGNED: Interactive AI Career Telemetry Cockpit */}
           <div className="w-full max-w-4xl">
@@ -307,6 +308,19 @@ export const Hero: React.FC = () => {
                       </span>
                     </div>
                   </div>
+                  <div className="flex items-end gap-2 mb-3">
+                    <span className="text-4xl font-display font-bold text-[#1A1A1A] dark:text-white">{activePreset.match}%</span>
+                    <span className="text-xs font-semibold text-[#7A8B7C] pb-1">Hiring Bar</span>
+                  </div>
+                  <div className="h-2 w-full bg-[#E8E6DE] dark:bg-[#2C2C29] rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-[#FF4D31] to-[#FF7A59]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${activePreset.match}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                    />
+                  </div>
+                </div>
 
                   {/* Live Simulation Indicator */}
                   <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-[#FF4D31]/10 text-[#FF4D31] border border-[#FF4D31]/20 flex items-center gap-1.5 shadow-2xs">

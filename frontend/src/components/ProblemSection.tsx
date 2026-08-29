@@ -3,31 +3,28 @@ import { motion } from 'motion/react';
 import { HelpCircle, Shuffle, Split, Check } from 'lucide-react';
 import { TiltCard } from './3d/TiltCard';
 
-export const ProblemSection: React.FC = () => {
-  const problems = [
-    {
-      icon: Split,
-      tag: 'PARALYSIS',
-      title: 'TOO MANY CHOICES',
-      description: 'Thousands of courses, tutorials, and bootcamps. No clear starting point or vetted curriculum.',
-      impact: 'Learners spend 40% of their time researching what to study rather than learning.',
-    },
-    {
-      icon: Shuffle,
-      tag: 'INEFFICIENCY',
-      title: 'WRONG SEQUENCE',
-      description: 'Attempting advanced architectures before solidifying linear algebra and async foundations.',
-      impact: 'High drop-off rates due to hidden conceptual prerequisites.',
-    },
-    {
-      icon: HelpCircle,
-      tag: 'ONE-SIZE-FITS-NONE',
-      title: 'GENERIC PATHS',
-      description: 'Static 100-hour syllabi that force you to re-learn skills you already know from past projects.',
-      impact: 'Boredom and stalled career momentum.',
-    },
-  ];
+const PROBLEMS = [
+  {
+    icon: <Search className="w-6 h-6 text-[#FF4D31]" />,
+    title: 'PARALYSIS',
+    subtitle: 'TOO MANY CHOICES',
+    description: 'Learners spend up to 40% of their time just researching what to learn next instead of actually learning.',
+  },
+  {
+    icon: <MoveDown className="w-6 h-6 text-[#FF4D31]" />,
+    title: 'INEFFICIENCY',
+    subtitle: 'WRONG SEQUENCE',
+    description: 'High drop-off rates occur when learners hit hidden math or architecture prerequisites they weren\'t warned about.',
+  },
+  {
+    icon: <Users className="w-6 h-6 text-[#FF4D31]" />,
+    title: 'ONE-SIZE-FITS-NONE',
+    subtitle: 'GENERIC PATHS',
+    description: 'Static syllabi force experienced learners into duplicate review while leaving beginners behind.',
+  }
+];
 
+export const ProblemSection: React.FC = () => {
   return (
     <section id="problem-section" className="py-20 md:py-28 bg-transparent border-y border-[#E8E6DE]/60 dark:border-[#2C2C29]/60 transition-colors duration-300 relative overflow-hidden">
       {/* 3D Ambient Background Accents */}
@@ -38,21 +35,29 @@ export const ProblemSection: React.FC = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center justify-center gap-2 mb-6"
           >
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#F9F8F3] dark:bg-[#252522] rounded-full text-[10px] font-bold tracking-widest text-[#7A8B7C] uppercase mb-4 shadow-2xs">
               THE STRUCTURAL FLAW IN ONLINE LEARNING
-            </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-[#1A1A1A] dark:text-white tracking-tight">
-              The problem isn't finding courses.{' '}
-              <span className="block font-editorial italic font-normal text-[#4A4A4A] dark:text-[#A0A09B] mt-1">
-                It's knowing which one comes next.
-              </span>
-            </h2>
+            </span>
           </motion.div>
+          
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-4xl sm:text-5xl font-bold leading-tight text-[#1A1A1A] dark:text-white"
+          >
+            The problem isn't finding courses.{' '}
+            <span className="font-editorial italic text-[#4A4A4A]/80 dark:text-[#A0A09B]/80 block">
+              It's knowing which one comes next.
+            </span>
+          </motion.h2>
         </div>
 
         {/* 3 3D Tilt Problem Cards */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
 import { Target, ScanEye, Route, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { TiltCard } from './3d/TiltCard';
@@ -49,6 +49,7 @@ export const HowItWorks: React.FC = () => {
     },
   ];
 
+export const HowItWorks: React.FC = () => {
   return (
     <section id="how-it-works" className="py-24 md:py-32 bg-transparent transition-colors duration-300 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -125,6 +126,7 @@ export const HowItWorks: React.FC = () => {
             })}
           </div>
         </div>
+        
       </div>
     </section>
   );
