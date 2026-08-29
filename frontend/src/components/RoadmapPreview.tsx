@@ -1,272 +1,256 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, GitCommit, ArrowDown, Sparkles, Clock, Award } from 'lucide-react';
+import { Map, Code2, Network, Shield, ChevronRight, Target, CheckCircle2, Workflow } from 'lucide-react';
+import { TiltCard } from './ui/TiltCard';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-interface VisualNode {
-  id: string;
-  title: string;
-  category: string;
-  status: 'completed' | 'current' | 'next' | 'locked' | 'recommended';
-  weeks: string;
-  summary: string;
-  skills: string[];
-  deliverable?: string;
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-const ROADMAP_STEPS: VisualNode[] = [
+const ROADMAP_NODES = [
   {
-    id: 'step-py',
+    id: 1,
     title: 'Python for High-Performance Systems',
-    category: 'Stage 1: Core Engineering',
+    description: 'Master advanced Python constructs required for AI infrastructure.',
+    capstone: 'Async Distributed Task Queue',
+    skills: ['Asyncio', 'Multiprocessing', 'Type Annotations', 'Memory Profiling'],
     status: 'completed',
-    weeks: '2 weeks',
-    summary: 'Memory optimization, vector math with NumPy/C extensions, and asyncio task loops.',
-    skills: ['Python 3.12', 'NumPy', 'AsyncIO', 'Memory Profiling'],
-    deliverable: 'Vectorized Mathematical Engine',
+    icon: <Code2 className="w-5 h-5" />
   },
   {
-    id: 'step-ml',
+    id: 2,
     title: 'Applied Machine Learning & Evaluation',
-    category: 'Stage 1: Statistical AI',
+    description: 'Build intuition for classical ML pipelines and robust evaluation.',
+    capstone: 'End-to-End Evaluation Suite',
+    skills: ['Scikit-Learn', 'Cross-Validation', 'Metrics', 'Feature Engineering'],
     status: 'completed',
-    weeks: '3 weeks',
-    summary: 'Loss functions, gradient descent mechanics, cross-validation, and tabular pipelines.',
-    skills: ['Scikit-Learn', 'Feature Stores', 'Loss Optimization', 'XGBoost'],
-    deliverable: 'Production Churn Predictor',
+    icon: <Target className="w-5 h-5" />
   },
   {
-    id: 'step-dl',
+    id: 3,
     title: 'Deep Learning & Neural Architectures',
-    category: 'Stage 2: Modern Neural Networks',
-    status: 'current',
-    weeks: '2 weeks',
-    summary: 'PyTorch autograd graphs, GPU acceleration, backpropagation mechanics, and CNN/RNN topologies.',
-    skills: ['PyTorch', 'Backpropagation', 'CUDA', 'TorchVision'],
-    deliverable: 'Custom Variational Autoencoder',
+    description: 'Understand tensors, backpropagation, and core PyTorch mechanics.',
+    capstone: 'Custom PyTorch Autograd Engine',
+    skills: ['PyTorch', 'Backpropagation', 'Tensors', 'Gradient Descent'],
+    status: 'active',
+    icon: <Network className="w-5 h-5" />
   },
   {
-    id: 'step-llm',
+    id: 4,
     title: 'LLM Fundamentals & Attention Layers',
-    category: 'Stage 2: Transformer Architectures',
-    status: 'next',
-    weeks: '2 weeks',
-    summary: 'Multi-head self-attention, positional encoding, KV caching, tokenization algorithms.',
-    skills: ['Transformers', 'Self-Attention', 'Tokenizers', 'HuggingFace'],
-    deliverable: 'Micro-GPT Built from Scratch',
+    description: 'Deconstruct transformer architecture from the ground up.',
+    capstone: 'Micro-GPT from Scratch',
+    skills: ['Transformers', 'Self-Attention', 'Tokenization', 'Positional Encoding'],
+    status: 'locked',
+    icon: <Map className="w-5 h-5" />
   },
   {
-    id: 'step-rag',
+    id: 5,
     title: 'Enterprise RAG & Hybrid Vector Retrieval',
-    category: 'Stage 3: Information Retrieval',
-    status: 'recommended',
-    weeks: '3 weeks',
-    summary: 'Dense vector embeddings, HNSW indexing, BM25 hybrid search, and cross-encoder re-ranking.',
-    skills: ['Vector DBs', 'Hybrid Search', 'LangChain', 'Cross-Encoders'],
-    deliverable: 'Multi-Tenant Document Search Engine',
+    description: 'Design production-ready retrieval augmented generation pipelines.',
+    capstone: 'Multi-Tenant Search Engine',
+    skills: ['Vector DBs', 'Semantic Search', 'Chunking Strategies', 'Hybrid Retrieval'],
+    status: 'locked',
+    icon: <Shield className="w-5 h-5" />
   },
   {
-    id: 'step-agents',
+    id: 6,
     title: 'Autonomous AI Agents & Tool Calling',
-    category: 'Stage 3: Agentic Workflows',
-    status: 'recommended',
-    weeks: '3 weeks',
-    summary: 'ReAct loops, function calling, stateful graphs, planning hierarchies, and guardrail validation.',
-    skills: ['ReAct Framework', 'Function Calling', 'State Machines', 'Guardrails'],
-    deliverable: 'Autonomous Code Refactoring Agent',
-  },
-  {
-    id: 'step-portfolio',
-    title: 'Production Capstone: Scalable AI Microservice',
-    category: 'Stage 4: Deployment & Mastery',
-    status: 'recommended',
-    weeks: '2 weeks',
-    summary: 'FastAPI streaming endpoints, Docker containerization, latency evaluation, and continuous benchmarking.',
-    skills: ['FastAPI', 'Docker', 'RAG Triad Evaluation', 'vLLM/Ollama'],
-    deliverable: 'Venture-Ready Full Stack AI App',
-  },
+    description: 'Orchestrate multi-agent swarms with complex tool usage.',
+    capstone: 'LangGraph Autonomous Swarms',
+    skills: ['Agentic Workflows', 'Function Calling', 'State Management', 'LangChain'],
+    status: 'locked',
+    icon: <Workflow className="w-5 h-5" />
+  }
 ];
 
 export const RoadmapPreview: React.FC = () => {
-  const [selectedNode, setSelectedNode] = useState<VisualNode>(ROADMAP_STEPS[2]);
+  const [activeNode, setActiveNode] = useState(ROADMAP_NODES[2]);
 
   return (
-    <section id="learning-paths" className="py-24 md:py-32 bg-[#F1EFE7]/50 dark:bg-[#151514] border-y border-[#E8E6DE] dark:border-[#2C2C29] transition-colors duration-300">
+    <section id="curriculum" className="relative py-24 bg-transparent z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+        
+        {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F9F8F3] dark:bg-[#252522] rounded-full text-[10px] font-bold tracking-widest text-[#7A8B7C] uppercase mb-4">
-            DYNAMIC SEQUENCING
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-[#1A1A1A] dark:text-white tracking-tight">
-            One goal. Hundreds of possible paths.{' '}
-            <span className="block font-editorial italic font-normal text-[#4A4A4A] dark:text-[#A0A09B] mt-1">
-              AI finds yours.
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center justify-center gap-2 mb-4"
+          >
+            <Map className="w-4 h-4 text-[#FF4D31]" />
+            <span className="text-xs font-bold uppercase tracking-widest text-[#7A8B7C]">
+              CURRICULUM ARCHITECTURE
             </span>
-          </h2>
-          <p className="text-base sm:text-lg text-[#4A4A4A] dark:text-[#A0A09B] mt-4">
-            Click any milestone node along the timeline to inspect why PathAI positioned it in this exact order.
-          </p>
+          </motion.div>
+          
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-4xl sm:text-5xl font-bold leading-tight text-[#1A1A1A] dark:text-white mb-6"
+          >
+            A path built for <span className="text-[#FF4D31]">production</span>, not just tutorials.
+          </motion.h2>
+          
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-lg text-[#4A4A4A] dark:text-[#A0A09B]"
+          >
+            Every node in your roadmap is a verified milestone culminating in a production-grade capstone project.
+          </motion.p>
         </div>
 
-        {/* 2-Column Interactive Roadmap View */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Timeline (7 cols) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#1A1A18] rounded-3xl p-6 sm:p-8 border border-[#E8E6DE] dark:border-[#2C2C29] shadow-xs">
-            <div className="flex items-center justify-between pb-4 mb-6 border-b border-[#E8E6DE] dark:border-[#2C2C29] text-xs font-semibold text-[#7A8B7C]">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#7A8B7C]"></span> START: Verified Background
-              </span>
-              <span className="text-[#FF4D31] font-bold flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Target: AI/ML Engineer
-              </span>
-            </div>
-
-            <div className="relative space-y-4">
-              {ROADMAP_STEPS.map((node, index) => {
-                const isSelected = selectedNode.id === node.id;
-                const isCompleted = node.status === 'completed';
-                const isCurrent = node.status === 'current';
-
-                return (
-                  <div key={node.id} className="relative">
-                    <motion.div
-                      initial={{ opacity: 0, x: -16 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.35, delay: index * 0.08 }}
-                      onClick={() => setSelectedNode(node)}
-                      className={`flex items-center justify-between p-4.5 rounded-2xl border transition-all duration-200 cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#F9F8F3] dark:bg-[#252522] border-[#FF4D31] shadow-md shadow-[#FF4D31]/10 ring-1 ring-[#FF4D31]'
-                          : 'bg-white dark:bg-[#1A1A18] border-[#E8E6DE] dark:border-[#2C2C29] hover:border-[#7A8B7C]'
-                      }`}
+        {/* Interactive Split Layout */}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+          
+          {/* Left: Sequential Milestones */}
+          <div className="w-full lg:w-3/5">
+            <div className="relative pl-6 lg:pl-10">
+              {/* Connector line */}
+              <div className="absolute top-0 bottom-0 left-[27px] lg:left-[43px] w-1 bg-gradient-to-b from-[#E8E6DE] via-[#E8E6DE] to-transparent dark:from-[#2C2C29] dark:via-[#2C2C29] dark:to-transparent rounded-full z-0" />
+              
+              <div className="space-y-8 relative z-10">
+                {ROADMAP_NODES.map((node, index) => (
+                  <motion.div
+                    key={node.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <button
+                      onClick={() => setActiveNode(node)}
+                      className={cn(
+                        "w-full text-left relative flex items-start gap-6 p-5 rounded-2xl transition-all duration-300 group",
+                        activeNode.id === node.id 
+                          ? "bg-white dark:bg-[#1A1A18] shadow-xl border border-[#FF4D31]/30 scale-[1.02]" 
+                          : "bg-white/40 dark:bg-[#1A1A18]/40 border border-[#E8E6DE] dark:border-[#2C2C29] hover:bg-white dark:hover:bg-[#252522]"
+                      )}
                     >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
-                            isCompleted
-                              ? 'bg-[#7A8B7C] text-white'
-                              : isCurrent
-                              ? 'bg-[#FF4D31] text-white shadow-md shadow-[#FF4D31]/30 animate-pulse'
-                              : 'bg-[#F1EFE7] dark:bg-[#252522] text-[#7A8B7C] border border-[#E8E6DE] dark:border-[#2C2C29]'
-                          }`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : isCurrent ? (
-                            <GitCommit className="w-4 h-4" />
-                          ) : (
-                            <span>{index + 1}</span>
-                          )}
+                      {/* Status Icon */}
+                      <div className={cn(
+                        "w-12 h-12 shrink-0 rounded-full flex items-center justify-center transition-colors shadow-sm",
+                        node.status === 'completed' ? "bg-[#9BB09E] text-white" :
+                        node.status === 'active' ? "bg-[#FF4D31] text-white ring-4 ring-[#FF4D31]/20 animate-pulse" :
+                        "bg-[#F1EFE7] dark:bg-[#252522] text-[#7A8B7C]"
+                      )}>
+                        {node.icon}
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-xs font-bold uppercase tracking-widest text-[#7A8B7C]">Stage {node.id}</span>
+                          {node.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-[#9BB09E]" />}
                         </div>
-
-                        <div>
-                          <h4 className="text-sm font-bold text-[#1A1A1A] dark:text-white leading-snug">
-                            {node.title}
-                          </h4>
-                          <span className="text-[11px] font-medium text-[#7A8B7C]">
-                            {node.category}
-                          </span>
-                        </div>
+                        <h3 className={cn(
+                          "text-lg font-bold mb-2 transition-colors",
+                          activeNode.id === node.id ? "text-[#FF4D31]" : "text-[#1A1A1A] dark:text-white group-hover:text-[#FF4D31]"
+                        )}>
+                          {node.title}
+                        </h3>
+                        <p className="text-sm text-[#4A4A4A] dark:text-[#A0A09B] leading-relaxed">
+                          {node.description}
+                        </p>
                       </div>
-
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                            isCompleted
-                              ? 'bg-[#7A8B7C]/15 text-[#7A8B7C]'
-                              : isCurrent
-                              ? 'bg-[#FF4D31]/15 text-[#FF4D31]'
-                              : 'bg-[#F1EFE7] dark:bg-[#252522] text-[#7A8B7C]'
-                          }`}
-                        >
-                          {node.status}
-                        </span>
-                        <span className="text-xs font-semibold text-[#7A8B7C] hidden sm:inline">
-                          {node.weeks}
-                        </span>
+                      
+                      <div className={cn(
+                        "opacity-0 transition-opacity",
+                        activeNode.id === node.id && "opacity-100 hidden sm:block"
+                      )}>
+                        <ChevronRight className="w-5 h-5 text-[#FF4D31]" />
                       </div>
-                    </motion.div>
-
-                    {index < ROADMAP_STEPS.length - 1 && (
-                      <div className="flex justify-center my-1.5">
-                        <ArrowDown className="w-3.5 h-3.5 text-[#E8E6DE] dark:text-[#2C2C29]" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Right Column: Node Detailed Inspector Card (5 cols) */}
-          <div className="lg:col-span-5 sticky top-28">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={selectedNode.id}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-[#1A1A18] rounded-3xl p-7 sm:p-8 border border-[#E8E6DE] dark:border-[#2C2C29] shadow-xl"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#FF4D31]">
-                    NODE INSPECTOR
-                  </span>
-                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F1EFE7] dark:bg-[#252522] text-[#7A8B7C]">
-                    <Clock className="w-3 h-3 inline mr-1 text-[#FF4D31]" />
-                    {selectedNode.weeks}
-                  </span>
-                </div>
-
-                <h3 className="text-xl font-display font-bold text-[#1A1A1A] dark:text-white mb-2">
-                  {selectedNode.title}
-                </h3>
-                <p className="text-sm text-[#4A4A4A] dark:text-[#A0A09B] leading-relaxed mb-6">
-                  {selectedNode.summary}
-                </p>
-
-                {/* Skills Gained */}
-                <div className="mb-6">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#7A8B7C] block mb-2.5">
-                    Skills Gained & Verified
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedNode.skills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="text-xs font-medium px-3 py-1 rounded-full bg-[#F1EFE7] dark:bg-[#252522] text-[#1A1A1A] dark:text-white border border-[#E8E6DE] dark:border-[#2C2C29]"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+          {/* Right: Sticky Inspector Card */}
+          <div className="w-full lg:w-2/5 relative">
+            <div className="sticky top-28">
+              <TiltCard className="p-8 h-[600px] flex flex-col shadow-2xl border border-[#FF4D31]/10">
+                <div className="flex items-center gap-3 mb-8 pb-6 border-b border-[#E8E6DE] dark:border-[#2C2C29]">
+                  <div className="w-10 h-10 rounded-xl bg-[#F1EFE7] dark:bg-[#252522] flex items-center justify-center text-[#1A1A1A] dark:text-white">
+                    {activeNode.icon}
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#7A8B7C]">Node Inspector</h4>
+                    <span className="text-sm font-bold text-[#1A1A1A] dark:text-white">Stage {activeNode.id}</span>
                   </div>
                 </div>
 
-                {/* Hands-on Deliverable */}
-                {selectedNode.deliverable && (
-                  <div className="p-4 rounded-2xl bg-[#F9F8F3] dark:bg-[#252522] border border-[#E8E6DE] dark:border-[#2C2C29] mb-6">
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#1A1A1A] dark:text-white mb-1">
-                      <Award className="w-4 h-4 text-[#FF4D31]" />
-                      <span>Portfolio Deliverable:</span>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeNode.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex-1 flex flex-col"
+                  >
+                    <h2 className="text-2xl font-bold text-[#1A1A1A] dark:text-white mb-8 leading-tight">
+                      {activeNode.title}
+                    </h2>
+
+                    <div className="space-y-8 flex-1">
+                      {/* Capstone Deliverable */}
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A] dark:text-white mb-3">
+                          Capstone Deliverable
+                        </h4>
+                        <div className="bg-[#F9F8F3] dark:bg-[#121211] p-4 rounded-xl border border-[#E8E6DE] dark:border-[#2C2C29] flex items-start gap-3">
+                          <Target className="w-5 h-5 text-[#FF4D31] shrink-0 mt-0.5" />
+                          <p className="text-sm font-medium text-[#4A4A4A] dark:text-[#A0A09B]">
+                            {activeNode.capstone}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Skills Acquired */}
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A] dark:text-white mb-4">
+                          Verified Skills
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {activeNode.skills.map((skill, index) => (
+                            <span 
+                              key={index}
+                              className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#F1EFE7] dark:bg-[#252522] text-[#1A1A1A] dark:text-white border border-[#E8E6DE] dark:border-[#2C2C29]"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-[#4A4A4A] dark:text-[#A0A09B]">
-                      {selectedNode.deliverable}
-                    </p>
-                  </div>
-                )}
-
-                <Link
-                  to="/register"
-                  className="w-full text-center block py-3.5 rounded-full font-semibold text-sm bg-[#FF4D31] hover:bg-[#E8402A] text-white shadow-lg shadow-[#FF4D31]/20 transition-all"
-                >
-                  Generate My Custom Sequence →
-                </Link>
-              </motion.div>
-            </AnimatePresence>
+                    
+                    <div className="mt-8 pt-6 border-t border-[#E8E6DE] dark:border-[#2C2C29]">
+                       <button className={cn(
+                         "w-full py-4 rounded-xl text-sm font-bold transition-all shadow-md",
+                         activeNode.status === 'completed' ? "bg-[#9BB09E]/20 text-[#9BB09E] cursor-default" :
+                         activeNode.status === 'active' ? "bg-[#FF4D31] text-white hover:bg-[#E8402A] shadow-[#FF4D31]/20" :
+                         "bg-[#F1EFE7] dark:bg-[#252522] text-[#7A8B7C] cursor-not-allowed"
+                       )}>
+                         {activeNode.status === 'completed' ? 'Module Completed' :
+                          activeNode.status === 'active' ? 'Resume Module' : 'Locked'}
+                       </button>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </TiltCard>
+            </div>
           </div>
+          
         </div>
       </div>
     </section>
