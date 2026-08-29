@@ -56,9 +56,9 @@ const usersDb: Map<string, DbUser> = new Map();
 const seedDemoUser = async () => {
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash("password123", salt);
-  
+
   const defaultRoadmap = generateDefaultRoadmap("Alex Rivera", "Become an AI/ML Engineer", "intermediate", ["Python", "SQL", "Machine Learning"], 15);
-  
+
   usersDb.set("alex@pathai.dev", {
     id: "user-demo-101",
     name: "Alex Rivera",
@@ -82,7 +82,7 @@ seedDemoUser();
 
 function generateDefaultRoadmap(userName: string, targetGoal: string, experience: string, knownSkills: string[], hours: number) {
   const isAIML = targetGoal.toLowerCase().includes("ai") || targetGoal.toLowerCase().includes("ml") || targetGoal.toLowerCase().includes("generative");
-  
+
   return {
     id: "roadmap-" + Math.random().toString(36).substring(2, 9),
     userId: "user",
@@ -517,7 +517,7 @@ app.post("/api/onboarding/profile", authenticateToken, async (req: AuthRequest, 
       resourceBudget,
       immediateMotivation
     } = req.body;
-    
+
     const user = usersDb.get(req.user!.email);
 
     if (!user) {
@@ -1915,8 +1915,8 @@ Return JSON in this EXACT schema:
     const suggestedReplies = completedCount >= 10
       ? ['Generate My Roadmap Now 🚀', 'Add more details', 'Review my profile']
       : completedCount >= 6
-      ? ['Generate My Roadmap Now 🚀', `I know ${current.knownSkills.length > 0 ? current.knownSkills.slice(0,3).join(', ') : 'Python, JavaScript'}`, 'I want to focus on AI/ML']
-      : ['I have a B.Tech in CS, targeting AI/ML roles', 'I know Python, React, and SQL', 'I\'m a fresher looking for placements'];
+        ? ['Generate My Roadmap Now 🚀', `I know ${current.knownSkills.length > 0 ? current.knownSkills.slice(0, 3).join(', ') : 'Python, JavaScript'}`, 'I want to focus on AI/ML']
+        : ['I have a B.Tech in CS, targeting AI/ML roles', 'I know Python, React, and SQL', 'I\'m a fresher looking for placements'];
 
     return res.json({
       extractedProfile: current,
