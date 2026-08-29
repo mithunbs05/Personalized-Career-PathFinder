@@ -19,5 +19,12 @@ export const roadmapService = {
       method: 'POST',
       body: JSON.stringify({ message, context }),
     });
-  }
+  },
+
+  async generateRoadmap(params?: { targetGoal?: string; experienceLevel?: string; weeklyHours?: number }): Promise<LearningRoadmap> {
+    return request<LearningRoadmap>('/roadmap/generate', {
+      method: 'POST',
+      body: params ? JSON.stringify(params) : undefined,
+    });
+  },
 };

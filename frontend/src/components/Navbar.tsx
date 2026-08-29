@@ -10,6 +10,11 @@ export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const handleSignOut = async () => {
+    navigate('/', { replace: true });
+    await logout();
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 20) {
@@ -55,7 +60,7 @@ export const Navbar: React.FC = () => {
             href="#how-it-works"
             className="hover:text-[#1A1A1A] dark:hover:text-white transition-colors"
           >
-            How It Works
+            Curriculum
           </a>
           <a
             id="nav-link-features"
@@ -69,21 +74,14 @@ export const Navbar: React.FC = () => {
             href="#learning-paths"
             className="hover:text-[#1A1A1A] dark:hover:text-white transition-colors"
           >
-            Learning Paths
-          </a>
-          <a
-            id="nav-link-ai-mentor"
-            href="#ai-mentor"
-            className="hover:text-[#1A1A1A] dark:hover:text-white transition-colors"
-          >
-            AI Mentor
+            Personalization Demo
           </a>
         </nav>
 
         {/* Right: Auth & Theme Toggle */}
         <div className="hidden md:flex items-center gap-6">
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 id="nav-dashboard-link"
                 type="button"
@@ -92,6 +90,14 @@ export const Navbar: React.FC = () => {
               >
                 <UserCheck className="w-4 h-4 text-[#FF4D31]" />
                 <span>Dashboard</span>
+              </button>
+              <button
+                id="nav-signout-btn"
+                type="button"
+                onClick={handleSignOut}
+                className="text-sm font-semibold text-[#4A4A4A] dark:text-[#A0A09B] hover:text-[#FF4D31] transition-colors cursor-pointer"
+              >
+                Sign Out
               </button>
             </div>
           ) : (
@@ -171,16 +177,28 @@ export const Navbar: React.FC = () => {
               </a>
               <div className="pt-4 border-t border-[#E8E6DE] dark:border-[#2C2C29] flex flex-col gap-3">
                 {user ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      navigate('/dashboard');
-                    }}
-                    className="w-full text-center py-2.5 rounded-full font-semibold bg-[#1A1A1A] text-white dark:bg-white dark:text-[#1A1A1A] cursor-pointer"
-                  >
-                    Go to Dashboard
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        navigate('/dashboard');
+                      }}
+                      className="w-full text-center py-2.5 rounded-full font-semibold bg-[#1A1A1A] text-white dark:bg-white dark:text-[#1A1A1A] cursor-pointer"
+                    >
+                      Go to Dashboard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setMobileOpen(false);
+                        await handleSignOut();
+                      }}
+                      className="w-full text-center py-2.5 rounded-full font-semibold border border-[#E8E6DE] dark:border-[#2C2C29] text-[#4A4A4A] dark:text-[#A0A09B] hover:text-[#FF4D31] cursor-pointer"
+                    >
+                      Sign Out
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button

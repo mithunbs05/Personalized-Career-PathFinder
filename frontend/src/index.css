@@ -50,6 +50,109 @@
   background: rgba(150, 150, 150, 0.4);
 }
 
+/* ===================================================
+   3D SPATIAL & PERSPECTIVE UTILITIES & ANIMATIONS
+=================================================== */
+
+.perspective-800 {
+  perspective: 800px;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.perspective-1500 {
+  perspective: 1500px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+/* 3D Floating Animations */
+@keyframes float-3d-slow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg);
+  }
+  25% {
+    transform: translate3d(-4px, -8px, 12px) rotateX(3deg) rotateY(-3deg);
+  }
+  75% {
+    transform: translate3d(4px, -12px, 20px) rotateX(-2deg) rotateY(3deg);
+  }
+}
+
+.animate-3d-float {
+  animation: float-3d-slow 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes float-3d-reverse {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg);
+  }
+  33% {
+    transform: translate3d(5px, -10px, 15px) rotateX(-3deg) rotateY(4deg);
+  }
+  66% {
+    transform: translate3d(-3px, -6px, 10px) rotateX(2deg) rotateY(-2deg);
+  }
+}
+
+.animate-3d-float-delayed {
+  animation: float-3d-reverse 8.5s cubic-bezier(0.45, 0, 0.55, 1) infinite 1s;
+}
+
+/* 3D Rotating Orbit Animation */
+@keyframes orbit-3d {
+  0% {
+    transform: rotateX(60deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(60deg) rotateZ(360deg);
+  }
+}
+
+.animate-3d-orbit {
+  animation: orbit-3d 14s linear infinite;
+}
+
+/* 3D Pulse Aura Glow */
+@keyframes pulse-3d-glow {
+  0%, 100% {
+    box-shadow: 0 10px 30px -10px rgba(255, 77, 49, 0.25), 0 0 20px 0 rgba(255, 77, 49, 0.1);
+    transform: translateZ(0);
+  }
+  50% {
+    box-shadow: 0 20px 40px -5px rgba(255, 77, 49, 0.4), 0 0 35px 8px rgba(255, 77, 49, 0.2);
+    transform: translateZ(12px);
+  }
+}
+
+.animate-3d-glow {
+  animation: pulse-3d-glow 4s ease-in-out infinite;
+}
+
+/* 3D Entry & Flip */
+@keyframes flip-in-3d {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) rotateX(20deg) translateY(24px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) rotateX(0deg) translateY(0) scale(1);
+  }
+}
+
+.animate-3d-flip-in {
+  animation: flip-in-3d 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Smooth pulse animation */
 @keyframes subtle-float {
   0%, 100% {
@@ -95,72 +198,6 @@
 .animate-typing-1 { animation: typing-dot 1.4s infinite 0s; }
 .animate-typing-2 { animation: typing-dot 1.4s infinite 0.2s; }
 .animate-typing-3 { animation: typing-dot 1.4s infinite 0.4s; }
-
-/* Mastery ring animation */
-@keyframes mastery-fill {
-  from {
-    stroke-dashoffset: 283;
-  }
-}
-
-.animate-mastery-ring {
-  animation: mastery-fill 1.5s ease-out forwards;
-}
-
-/* Progress bar grow animation */
-@keyframes progress-grow {
-  from {
-    width: 0%;
-  }
-}
-
-.animate-progress-grow {
-  animation: progress-grow 1s ease-out forwards;
-}
-
-/* Gentle glow pulse for active elements */
-@keyframes glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 77, 49, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 16px 4px rgba(255, 77, 49, 0.2);
-  }
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-
-/* Staggered fade-in for list items */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out forwards;
-}
-
-/* Counter animation helper */
-@keyframes count-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-count-up {
-  animation: count-up 0.6s ease-out forwards;
-}
 
 /* Focus ring override for accessibility */
 *:focus-visible {

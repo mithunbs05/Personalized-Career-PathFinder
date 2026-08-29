@@ -16,6 +16,8 @@ import { Register } from './pages/Register';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
+import { Recommendations } from './pages/Recommendations';
+import { Telemetry } from './pages/Telemetry';
 
 export default function App() {
   return (
@@ -48,6 +50,26 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected Telemetry Cockpit Page */}
+            <Route
+              path="/telemetry"
+              element={
+                <ProtectedRoute>
+                  <Telemetry />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected Recommendations Page */}
+            <Route
+              path="/recommendations"
+              element={
+                <ProtectedRoute>
+                  <Recommendations />
                 </ProtectedRoute>
               }
             />

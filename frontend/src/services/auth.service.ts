@@ -169,7 +169,7 @@ export const authService = {
   },
 
   /**
-   * Sign out current user from Supabase and clear local state.
+   * Sign out current user from Supabase and clear local state. 
    */
   async logout(): Promise<void> {
     try {

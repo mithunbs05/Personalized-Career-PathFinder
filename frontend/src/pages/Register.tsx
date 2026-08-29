@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Lock, Mail, User, Sparkles, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { TiltCard } from '../components/3d/TiltCard';
 
 interface FormErrors {
   name?: string;
@@ -89,7 +90,7 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#F9F8F3] dark:bg-[#121211] text-[#1A1A1A] dark:text-[#F9F8F3] transition-colors duration-300">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#F9F8F3] dark:bg-[#121211] text-[#1A1A1A] dark:text-[#F9F8F3] transition-colors duration-300 relative">
       {/* LEFT SIDE: Brand & Value Prop (5 cols) */}
       <div className="hidden lg:flex lg:col-span-5 bg-[#F1EFE7]/80 dark:bg-[#1A1A18] p-12 flex-col justify-between border-r border-[#E8E6DE] dark:border-[#2C2C29] relative overflow-hidden">
         <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-[#7A8B7C]/10 rounded-full blur-3xl pointer-events-none" />
@@ -146,23 +147,20 @@ export const Register: React.FC = () => {
 
       {/* RIGHT SIDE: Register Card (7 cols) */}
       <div className="lg:col-span-7 flex items-center justify-center p-6 sm:p-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-lg bg-white dark:bg-[#1A1A18] rounded-3xl p-8 sm:p-10 border border-[#E8E6DE] dark:border-[#2C2C29] shadow-xl"
-        >
-          {/* Header */}
-          <div className="mb-6 flex items-start justify-between">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#1A1A1A] dark:text-white">
-                Create your PathAI account
-              </h2>
-              <p className="text-xs sm:text-sm text-[#4A4A4A] dark:text-[#A0A09B] mt-1">
-                Start your personalized learning roadmap in seconds.
-              </p>
-            </div>
-          </div>
+        <div className="w-full max-w-lg">
+          <TiltCard maxTilt={4} scale={1.005}>
+            <div className="bg-white dark:bg-[#1A1A18] rounded-3xl p-8 sm:p-10 border border-[#E8E6DE] dark:border-[#2C2C29] shadow-2xl">
+              {/* Header */}
+              <div className="mb-6 flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#1A1A1A] dark:text-white">
+                    Create your PathAI account
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[#4A4A4A] dark:text-[#A0A09B] mt-1">
+                    Start your personalized learning roadmap in seconds.
+                  </p>
+                </div>
+              </div>
 
           {/* Notice Banner */}
           {noticeMessage && !generalError && !successMessage && (
@@ -333,7 +331,9 @@ export const Register: React.FC = () => {
               Sign In
             </Link>
           </div>
-        </motion.div>
+            </div>
+          </TiltCard>
+        </div>
       </div>
     </div>
   );

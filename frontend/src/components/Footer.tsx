@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#F1EFE7]/50 dark:bg-[#151514] border-t border-[#E8E6DE] dark:border-[#2C2C29] py-12 transition-colors duration-300">
+    <footer className="relative z-20 bg-[#F1EFE7] dark:bg-[#161615] border-t border-[#E8E6DE] dark:border-[#2C2C29] py-12 transition-colors duration-300 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Feature Stats Bar from Design */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-12 mb-12 border-b border-[#E8E6DE] dark:border-[#2C2C29]">

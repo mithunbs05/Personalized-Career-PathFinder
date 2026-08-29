@@ -82,101 +82,168 @@ seedDemoUser();
 
 function generateDefaultRoadmap(userName: string, targetGoal: string, experience: string, knownSkills: string[], hours: number) {
   const isAIML = targetGoal.toLowerCase().includes("ai") || targetGoal.toLowerCase().includes("ml") || targetGoal.toLowerCase().includes("generative");
+  const isFullStack = targetGoal.toLowerCase().includes("full stack") || targetGoal.toLowerCase().includes("fullstack") || targetGoal.toLowerCase().includes("web");
+  const isData = targetGoal.toLowerCase().includes("data") && !isAIML;
+  const isBackend = targetGoal.toLowerCase().includes("backend") || targetGoal.toLowerCase().includes("server");
+  const isDevOps = targetGoal.toLowerCase().includes("devops") || targetGoal.toLowerCase().includes("cloud");
   
-  return {
-    id: "roadmap-" + Math.random().toString(36).substring(2, 9),
-    userId: "user",
-    targetGoal: targetGoal || "Generative AI Engineer",
-    createdAt: new Date().toISOString(),
-    overallProgress: 68,
-    estimatedCompletionWeeks: Math.max(8, Math.round(180 / (hours || 10))),
-    currentMilestone: "Build Production RAG Application",
-    nextRecommendedAction: {
-      nodeId: "node-rag",
-      title: "Vector Database Optimization & Hybrid Search",
-      actionText: "Start Interactive Lab",
-      estimatedMinutes: 45
-    },
-    stages: [
+  // Dynamic stage generation based on goal
+  const stages: any[] = [];
+  const competencies: any[] = [];
+
+  if (isFullStack) {
+    stages.push(
       {
-        id: "stage-1",
-        title: "Stage 1: Core Engineering & Mathematics",
-        order: 1,
-        status: "completed",
+        id: "stage-1", title: "Stage 1: Frontend Mastery", order: 1,
+        status: experience === "advanced" ? "completed" : experience === "intermediate" ? "completed" : "in-progress",
         nodes: [
           {
-            id: "node-python",
-            title: "Advanced Python for AI & Data Structures",
-            category: "Core Foundations",
-            status: "completed",
-            durationWeeks: 2,
-            description: "Master asynchronous Python, memory profiling, and high-performance vector operations.",
-            prerequisites: ["Basic Programming"],
-            skillsGained: ["Python", "NumPy", "AsyncIO", "OOP"],
-            progressPercent: 100,
-            difficulty: "Intermediate",
-            assessmentScore: 94,
+            id: "node-html-css", title: "Modern HTML5 & CSS3 Architectures", category: "Frontend",
+            status: experience !== "beginner" ? "completed" : "current",
+            durationWeeks: 2, description: "Semantic HTML, CSS Grid/Flexbox, responsive design, accessibility, and CSS custom properties.",
+            prerequisites: [], skillsGained: ["HTML5", "CSS3", "Responsive Design", "Accessibility"],
+            progressPercent: experience !== "beginner" ? 100 : 40, difficulty: "Beginner",
+            assessmentScore: experience !== "beginner" ? 92 : undefined,
             lessons: [
-              { id: "l1", title: "Memory Management & Vectorization in NumPy", type: "video", durationMinutes: 25, completed: true },
-              { id: "l2", title: "Async Task Execution & Concurrency", type: "coding-lab", durationMinutes: 40, completed: true },
-              { id: "l3", title: "Python Data Structures Mastery Assessment", type: "quiz", durationMinutes: 20, completed: true }
+              { id: "l1", title: "CSS Grid & Flexbox Masterclass", type: "video", durationMinutes: 30, completed: experience !== "beginner" },
+              { id: "l2", title: "Build a Responsive Portfolio", type: "project", durationMinutes: 90, completed: experience !== "beginner" },
+              { id: "l3", title: "Accessibility Best Practices Quiz", type: "quiz", durationMinutes: 15, completed: experience !== "beginner" }
             ]
           },
           {
-            id: "node-ml",
-            title: "Applied Machine Learning & Statistical Inference",
-            category: "Machine Learning",
-            status: "completed",
-            durationWeeks: 3,
-            description: "End-to-end model evaluation, gradient descent mechanics, and feature pipelines.",
-            prerequisites: ["Python for AI"],
-            skillsGained: ["Scikit-Learn", "Feature Engineering", "Model Metrics"],
-            progressPercent: 100,
-            difficulty: "Intermediate",
-            assessmentScore: 88,
+            id: "node-js-ts", title: "JavaScript ES2024+ & TypeScript", category: "Frontend",
+            status: experience !== "beginner" ? "completed" : "next",
+            durationWeeks: 3, description: "Modern JavaScript patterns, TypeScript type system, async/await, and module systems.",
+            prerequisites: ["Modern HTML5 & CSS3"], skillsGained: ["JavaScript", "TypeScript", "ES Modules", "Async Patterns"],
+            progressPercent: experience !== "beginner" ? 100 : 0, difficulty: "Intermediate",
             lessons: [
-              { id: "l4", title: "Bias-Variance Tradeoff & Cross-Validation", type: "article", durationMinutes: 15, completed: true },
-              { id: "l5", title: "Building a Production Tabular Classifier", type: "project", durationMinutes: 90, completed: true }
+              { id: "l4", title: "TypeScript Type System Deep Dive", type: "coding-lab", durationMinutes: 45, completed: experience !== "beginner" },
+              { id: "l5", title: "Async Patterns & Error Handling", type: "article", durationMinutes: 20, completed: experience !== "beginner" }
             ]
           }
         ]
       },
       {
-        id: "stage-2",
-        title: "Stage 2: Deep Learning & Modern Transformers",
-        order: 2,
-        status: "in-progress",
+        id: "stage-2", title: "Stage 2: React & State Management", order: 2,
+        status: experience === "advanced" ? "completed" : "in-progress",
         nodes: [
           {
-            id: "node-dl",
-            title: "Deep Learning Foundations & PyTorch",
-            category: "Deep Learning",
-            status: "current",
-            durationWeeks: 2,
-            description: "Neural network backprop mathematics, tensor graph architectures, and GPU acceleration.",
-            prerequisites: ["Applied Machine Learning"],
-            skillsGained: ["PyTorch", "Backpropagation", "CUDA"],
-            progressPercent: 75,
-            difficulty: "Intermediate",
-            milestoneTitle: "Custom Autoencoder Implementation",
-            isMilestone: true,
+            id: "node-react", title: "React 19 & Component Architecture", category: "Frontend Framework",
+            status: experience === "advanced" ? "completed" : experience === "intermediate" ? "current" : "locked",
+            durationWeeks: 3, description: "React hooks, server components, suspense boundaries, and component composition patterns.",
+            prerequisites: ["JavaScript ES2024+"], skillsGained: ["React", "Hooks", "Server Components", "Component Patterns"],
+            progressPercent: experience === "advanced" ? 100 : experience === "intermediate" ? 60 : 0, difficulty: "Intermediate",
+            milestoneTitle: "Full-Stack Task Management App", isMilestone: true,
             lessons: [
-              { id: "l6", title: "Autograd Engines & Computational Graphs", type: "coding-lab", durationMinutes: 45, completed: true },
-              { id: "l7", title: "Training Vision and Sequence Models", type: "video", durationMinutes: 30, completed: true },
-              { id: "l8", title: "PyTorch Optimization Lab", type: "coding-lab", durationMinutes: 50, completed: false }
+              { id: "l6", title: "React Hooks & Custom Hook Patterns", type: "coding-lab", durationMinutes: 50, completed: experience === "advanced" },
+              { id: "l7", title: "State Management with Context & Zustand", type: "video", durationMinutes: 35, completed: experience === "advanced" },
+              { id: "l8", title: "React Component Architecture Assessment", type: "quiz", durationMinutes: 20, completed: false }
             ]
           },
           {
-            id: "node-llm",
-            title: "LLM Fundamentals & Attention Mechanisms",
-            category: "Generative AI",
-            status: "next",
-            durationWeeks: 2,
-            description: "Decoder-only architectures, positional embeddings, KV caching, and tokenization dynamics.",
-            prerequisites: ["Deep Learning Foundations"],
-            skillsGained: ["Transformers", "Self-Attention", "Tokenizers"],
-            progressPercent: 0,
-            difficulty: "Advanced",
+            id: "node-nextjs", title: "Next.js App Router & Full-Stack Patterns", category: "Full Stack",
+            status: experience === "advanced" ? "current" : "locked",
+            durationWeeks: 3, description: "Server-side rendering, API routes, middleware, and deployment strategies.",
+            prerequisites: ["React 19"], skillsGained: ["Next.js", "SSR", "API Routes", "Edge Functions"],
+            progressPercent: experience === "advanced" ? 30 : 0, difficulty: "Advanced",
+            lessons: [
+              { id: "l9", title: "Next.js App Router Deep Dive", type: "video", durationMinutes: 40, completed: false },
+              { id: "l10", title: "Build a SaaS Landing Page", type: "project", durationMinutes: 120, completed: false }
+            ]
+          }
+        ]
+      },
+      {
+        id: "stage-3", title: "Stage 3: Backend & Databases", order: 3, status: "upcoming",
+        nodes: [
+          {
+            id: "node-node-api", title: "Node.js REST & GraphQL APIs", category: "Backend",
+            status: "recommended", durationWeeks: 3,
+            description: "Express/Fastify APIs, authentication, input validation, and rate limiting.",
+            prerequisites: ["Next.js App Router"], skillsGained: ["Node.js", "REST APIs", "GraphQL", "Authentication"],
+            progressPercent: 0, difficulty: "Intermediate", milestoneTitle: "Production API with Auth & Rate Limiting", isMilestone: true,
+            lessons: [
+              { id: "l11", title: "RESTful API Design Patterns", type: "article", durationMinutes: 25, completed: false },
+              { id: "l12", title: "Building GraphQL Resolvers", type: "coding-lab", durationMinutes: 60, completed: false }
+            ]
+          },
+          {
+            id: "node-db", title: "PostgreSQL & Database Design", category: "Backend",
+            status: "locked", durationWeeks: 2,
+            description: "Relational schema design, indexing strategies, ORMs, and query optimization.",
+            prerequisites: ["Node.js REST & GraphQL APIs"], skillsGained: ["PostgreSQL", "Schema Design", "Prisma ORM", "Query Optimization"],
+            progressPercent: 0, difficulty: "Intermediate",
+            lessons: [
+              { id: "l13", title: "Schema Design & Normalization", type: "video", durationMinutes: 30, completed: false },
+              { id: "l14", title: "Build a Multi-Tenant Database", type: "project", durationMinutes: 90, completed: false }
+            ]
+          }
+        ]
+      }
+    );
+    competencies.push(
+      { name: "HTML/CSS", score: experience !== "beginner" ? 88 : 35, color: "#FF4D36" },
+      { name: "JavaScript/TypeScript", score: experience === "advanced" ? 82 : experience === "intermediate" ? 60 : 20, color: "#6A8D73" },
+      { name: "React", score: experience === "advanced" ? 75 : experience === "intermediate" ? 45 : 10, color: "#E84A27" },
+      { name: "Backend/Node.js", score: experience === "advanced" ? 55 : 20, color: "#8E9AAF" }
+    );
+  } else {
+    // Default: AI/ML path (existing logic, now with proper prerequisite chains)
+    stages.push(
+      {
+        id: "stage-1", title: "Stage 1: Core Engineering & Mathematics", order: 1,
+        status: experience !== "beginner" ? "completed" : "in-progress",
+        nodes: [
+          {
+            id: "node-python", title: "Advanced Python for AI & Data Structures", category: "Core Foundations",
+            status: experience !== "beginner" ? "completed" : "current",
+            durationWeeks: 2, description: "Master asynchronous Python, memory profiling, and high-performance vector operations.",
+            prerequisites: ["Basic Programming"], skillsGained: ["Python", "NumPy", "AsyncIO", "OOP"],
+            progressPercent: experience !== "beginner" ? 100 : 40, difficulty: "Intermediate",
+            assessmentScore: experience !== "beginner" ? 94 : undefined,
+            lessons: [
+              { id: "l1", title: "Memory Management & Vectorization in NumPy", type: "video", durationMinutes: 25, completed: experience !== "beginner" },
+              { id: "l2", title: "Async Task Execution & Concurrency", type: "coding-lab", durationMinutes: 40, completed: experience !== "beginner" },
+              { id: "l3", title: "Python Data Structures Mastery Assessment", type: "quiz", durationMinutes: 20, completed: experience !== "beginner" }
+            ]
+          },
+          {
+            id: "node-ml", title: "Applied Machine Learning & Statistical Inference", category: "Machine Learning",
+            status: experience !== "beginner" ? "completed" : "next",
+            durationWeeks: 3, description: "End-to-end model evaluation, gradient descent mechanics, and feature pipelines.",
+            prerequisites: ["Advanced Python for AI"], skillsGained: ["Scikit-Learn", "Feature Engineering", "Model Metrics"],
+            progressPercent: experience !== "beginner" ? 100 : 0, difficulty: "Intermediate",
+            assessmentScore: experience !== "beginner" ? 88 : undefined,
+            lessons: [
+              { id: "l4", title: "Bias-Variance Tradeoff & Cross-Validation", type: "article", durationMinutes: 15, completed: experience !== "beginner" },
+              { id: "l5", title: "Building a Production Tabular Classifier", type: "project", durationMinutes: 90, completed: experience !== "beginner" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "stage-2", title: "Stage 2: Deep Learning & Modern Transformers", order: 2,
+        status: experience === "advanced" ? "completed" : "in-progress",
+        nodes: [
+          {
+            id: "node-dl", title: "Deep Learning Foundations & PyTorch", category: "Deep Learning",
+            status: experience === "advanced" ? "completed" : experience === "intermediate" ? "current" : "locked",
+            durationWeeks: 2, description: "Neural network backprop mathematics, tensor graph architectures, and GPU acceleration.",
+            prerequisites: ["Applied Machine Learning"], skillsGained: ["PyTorch", "Backpropagation", "CUDA"],
+            progressPercent: experience === "advanced" ? 100 : experience === "intermediate" ? 75 : 0, difficulty: "Intermediate",
+            milestoneTitle: "Custom Autoencoder Implementation", isMilestone: true,
+            lessons: [
+              { id: "l6", title: "Autograd Engines & Computational Graphs", type: "coding-lab", durationMinutes: 45, completed: experience !== "beginner" },
+              { id: "l7", title: "Training Vision and Sequence Models", type: "video", durationMinutes: 30, completed: experience !== "beginner" },
+              { id: "l8", title: "PyTorch Optimization Lab", type: "coding-lab", durationMinutes: 50, completed: experience === "advanced" }
+            ]
+          },
+          {
+            id: "node-llm", title: "LLM Fundamentals & Attention Mechanisms", category: "Generative AI",
+            status: experience === "advanced" ? "current" : "next",
+            durationWeeks: 2, description: "Decoder-only architectures, positional embeddings, KV caching, and tokenization dynamics.",
+            prerequisites: ["Deep Learning Foundations"], skillsGained: ["Transformers", "Self-Attention", "Tokenizers"],
+            progressPercent: experience === "advanced" ? 40 : 0, difficulty: "Advanced",
             lessons: [
               { id: "l9", title: "Inside the Multi-Head Attention Head", type: "article", durationMinutes: 20, completed: false },
               { id: "l10", title: "Building a Micro-GPT from Scratch", type: "coding-lab", durationMinutes: 90, completed: false }
@@ -185,40 +252,27 @@ function generateDefaultRoadmap(userName: string, targetGoal: string, experience
         ]
       },
       {
-        id: "stage-3",
-        title: "Stage 3: Retrieval Augmented Generation & Agents",
-        order: 3,
-        status: "upcoming",
+        id: "stage-3", title: "Stage 3: Retrieval Augmented Generation & Agents", order: 3, status: "upcoming",
         nodes: [
           {
-            id: "node-rag",
-            title: "Production RAG Systems & Vector DBs",
-            category: "Generative AI",
-            status: "recommended",
-            durationWeeks: 3,
+            id: "node-rag", title: "Production RAG Systems & Vector DBs", category: "Generative AI",
+            status: "recommended", durationWeeks: 3,
             description: "Chunking strategies, embedding alignment, semantic search, re-ranking, and latency tuning.",
-            prerequisites: ["LLM Fundamentals"],
-            skillsGained: ["Chroma/Pinecone", "Hybrid Search", "LangChain/LlamaIndex"],
-            progressPercent: 0,
-            difficulty: "Advanced",
-            isMilestone: true,
-            milestoneTitle: "Enterprise Document Q&A Engine",
+            prerequisites: ["LLM Fundamentals"], skillsGained: ["Chroma/Pinecone", "Hybrid Search", "LangChain/LlamaIndex"],
+            progressPercent: 0, difficulty: "Advanced",
+            isMilestone: true, milestoneTitle: "Enterprise Document Q&A Engine",
             lessons: [
               { id: "l11", title: "Vector Embedding Topologies & HNSW", type: "video", durationMinutes: 30, completed: false },
               { id: "l12", title: "Cross-Encoder Re-Ranking Pipelines", type: "coding-lab", durationMinutes: 60, completed: false }
             ]
           },
           {
-            id: "node-agents",
-            title: "Autonomous AI Agents & Tool Execution",
-            category: "AI Systems",
-            status: "locked",
-            durationWeeks: 3,
+            id: "node-agents", title: "Autonomous AI Agents & Tool Execution", category: "AI Systems",
+            status: "locked", durationWeeks: 3,
             description: "ReAct patterns, planning loops, structured JSON outputs, function calling, and state persistence.",
-            prerequisites: ["Production RAG Systems"],
-            skillsGained: ["Tool Calling", "Multi-Agent Protocols", "Evaluation"],
-            progressPercent: 0,
-            difficulty: "Advanced",
+            prerequisites: ["Production RAG Systems"], skillsGained: ["Tool Calling", "Multi-Agent Protocols", "Evaluation"],
+            progressPercent: 0, difficulty: "Advanced",
+            milestoneTitle: "Self-Healing Code Assistant", isMilestone: true,
             lessons: [
               { id: "l13", title: "ReAct & Reflexion Agent Architectures", type: "article", durationMinutes: 25, completed: false },
               { id: "l14", title: "Building a Self-Healing Code Assistant", type: "project", durationMinutes: 120, completed: false }
@@ -226,39 +280,335 @@ function generateDefaultRoadmap(userName: string, targetGoal: string, experience
           }
         ]
       }
-    ],
-    skillGaps: [
-      {
-        skill: "Vector Databases & Search",
-        currentLevel: 32,
-        targetLevel: 85,
-        gapScore: 53,
-        priority: "high",
-        recommendedAction: "Complete Vector Indexing and Re-ranking Module"
-      },
-      {
-        skill: "FastAPI Backend AI Services",
-        currentLevel: 62,
-        targetLevel: 90,
-        gapScore: 28,
-        priority: "high",
-        recommendedAction: "Build high-throughput streaming inference endpoint"
-      },
-      {
-        skill: "AI Evaluation & Guardrails",
-        currentLevel: 45,
-        targetLevel: 80,
-        gapScore: 35,
-        priority: "medium",
-        recommendedAction: "Practice RAG Triad benchmarks on synthetic datasets"
+    );
+    competencies.push(
+      { name: "Python", score: experience === "advanced" ? 92 : experience === "intermediate" ? 90 : 45, color: "#FF4D36" },
+      { name: "Machine Learning", score: experience === "advanced" ? 85 : experience === "intermediate" ? 78 : 20, color: "#6A8D73" },
+      { name: "Generative AI", score: experience === "advanced" ? 70 : experience === "intermediate" ? 62 : 8, color: "#E84A27" },
+      { name: "System Design", score: experience === "advanced" ? 60 : experience === "intermediate" ? 41 : 12, color: "#8E9AAF" }
+    );
+  }
+
+  // Compute overall progress
+  const allNodes = stages.flatMap((s: any) => s.nodes);
+  const completedNodes = allNodes.filter((n: any) => n.status === "completed").length;
+  const overallProgress = Math.round((completedNodes / allNodes.length) * 100);
+
+  // Determine current milestone
+  const currentNode = allNodes.find((n: any) => n.status === "current") || allNodes[0];
+
+  // Compute skill gaps based on competencies
+  const skillGaps = competencies
+    .filter((c: any) => c.score < 80)
+    .map((c: any) => ({
+      skill: c.name,
+      currentLevel: c.score,
+      targetLevel: 85,
+      gapScore: 85 - c.score,
+      priority: c.score < 40 ? "high" : c.score < 65 ? "high" : "medium",
+      recommendedAction: `Complete ${c.name} training modules and practice labs`
+    }));
+
+  return {
+    id: "roadmap-" + Math.random().toString(36).substring(2, 9),
+    userId: "user",
+    targetGoal: targetGoal || "Generative AI Engineer",
+    createdAt: new Date().toISOString(),
+    overallProgress,
+    estimatedCompletionWeeks: Math.max(8, Math.round(180 / (hours || 10))),
+    currentMilestone: currentNode?.milestoneTitle || currentNode?.title || "Getting Started",
+    nextRecommendedAction: {
+      nodeId: currentNode?.id || "node-1",
+      title: currentNode?.title || "Start Learning",
+      actionText: "Start Interactive Lab",
+      estimatedMinutes: 45
+    },
+    stages,
+    skillGaps,
+    competencies
+  };
+}
+
+// =================== RECOMMENDATION ENGINE ===================
+
+interface Recommendation {
+  id: string;
+  title: string;
+  type: 'course' | 'project' | 'resource';
+  provider: string;
+  level: string;
+  durationHours: number;
+  matchScore: number;
+  reasoning: string;
+  tags: string[];
+  description: string;
+  thumbnailColor: string;
+  url?: string;
+  dismissed?: boolean;
+  // Project-specific
+  skills?: string[];
+  deliverable?: string;
+  githubTemplateUrl?: string;
+  // Resource-specific
+  resourceType?: string;
+}
+
+// Deterministic recommendation catalog based on career goals
+function generateRecommendations(profile: any, roadmap: any): { courses: any[]; projects: any[]; resources: any[] } {
+  const goal = (profile?.targetGoal || "AI/ML Engineer").toLowerCase();
+  const skills = profile?.knownSkills || [];
+  const experience = profile?.experienceLevel || "intermediate";
+  const interests = profile?.technicalInterests || [];
+  const gaps = roadmap?.skillGaps || [];
+  const gapNames = gaps.map((g: any) => g.skill);
+
+  const isAI = goal.includes("ai") || goal.includes("ml") || goal.includes("generative");
+  const isWeb = goal.includes("full stack") || goal.includes("web") || goal.includes("frontend");
+  const isBackend = goal.includes("backend") || goal.includes("server");
+  const isData = goal.includes("data") && !isAI;
+
+  // Courses catalog
+  const allCourses = [
+    // AI/ML courses
+    {
+      id: "course-dl-spec", title: "Deep Learning Specialization", provider: "Coursera (Andrew Ng)",
+      level: "Intermediate", durationHours: 80, tags: ["Deep Learning", "Neural Networks", "PyTorch"],
+      description: "Master deep learning fundamentals: neural networks, hyperparameter tuning, CNNs, sequence models, and transformers.",
+      thumbnailColor: "#FF4D31", goalMatch: ["ai", "ml", "generative", "deep learning"],
+      reasoning: "Directly addresses your deep learning skill gap and builds the neural network foundations needed for your AI/ML career goal."
+    },
+    {
+      id: "course-llm-eng", title: "LLM Engineering: From Prompts to Production", provider: "DeepLearning.AI",
+      level: "Advanced", durationHours: 40, tags: ["LLMs", "RAG", "Prompt Engineering", "LangChain"],
+      description: "Build production LLM applications with RAG, function calling, evaluation frameworks, and deployment pipelines.",
+      thumbnailColor: "#6A8D73", goalMatch: ["ai", "generative", "llm"],
+      reasoning: "Targets your Generative AI skill gap and teaches the RAG pipeline skills you'll need for your production AI systems milestone."
+    },
+    {
+      id: "course-ml-ops", title: "Machine Learning Engineering for Production (MLOps)", provider: "Coursera (Google)",
+      level: "Advanced", durationHours: 60, tags: ["MLOps", "Model Deployment", "CI/CD", "Monitoring"],
+      description: "End-to-end ML lifecycle: data pipelines, model training at scale, deployment, monitoring, and A/B testing.",
+      thumbnailColor: "#8E9AAF", goalMatch: ["ai", "ml", "devops"],
+      reasoning: "Fills the System Design gap by teaching production ML infrastructure — essential for senior AI/ML engineering roles."
+    },
+    {
+      id: "course-fastapi", title: "Production FastAPI Microservices", provider: "TestDriven.io",
+      level: "Intermediate", durationHours: 25, tags: ["FastAPI", "Python", "REST APIs", "Docker"],
+      description: "Build scalable Python APIs with FastAPI, async patterns, Docker containerization, and CI/CD deployment.",
+      thumbnailColor: "#E84A27", goalMatch: ["ai", "backend", "full stack"],
+      reasoning: "Strengthens your backend API skills which are critical for deploying AI models as production services."
+    },
+    // Web Dev courses
+    {
+      id: "course-react-perf", title: "Advanced React Patterns & Performance", provider: "Frontend Masters",
+      level: "Advanced", durationHours: 30, tags: ["React", "Performance", "Architecture", "TypeScript"],
+      description: "Advanced component patterns, render optimization, code splitting, and large-scale React architecture.",
+      thumbnailColor: "#FF4D31", goalMatch: ["web", "full stack", "frontend", "react"],
+      reasoning: "Accelerates your React mastery with production patterns used in top-tier engineering teams."
+    },
+    {
+      id: "course-nextjs-full", title: "Next.js 15 Complete Developer Guide", provider: "Udemy (Stephen Grider)",
+      level: "Intermediate", durationHours: 45, tags: ["Next.js", "React", "SSR", "Full Stack"],
+      description: "Build full-stack applications with Next.js App Router, server actions, caching strategies, and deployment.",
+      thumbnailColor: "#6A8D73", goalMatch: ["web", "full stack", "frontend"],
+      reasoning: "Next.js is the industry standard for full-stack React — this course directly maps to your career goal."
+    },
+    {
+      id: "course-system-design", title: "System Design for Software Engineers", provider: "Educative.io",
+      level: "Advanced", durationHours: 35, tags: ["System Design", "Scalability", "Architecture"],
+      description: "Master distributed systems, load balancing, caching, database sharding, and real-time architectures.",
+      thumbnailColor: "#8E9AAF", goalMatch: ["backend", "full stack", "ai", "ml"],
+      reasoning: "System design is the highest-priority skill gap in your profile — essential for senior engineering interviews."
+    },
+    {
+      id: "course-python-ds", title: "Python for Data Science & Machine Learning", provider: "Udemy (Jose Portilla)",
+      level: "Beginner", durationHours: 40, tags: ["Python", "Pandas", "NumPy", "Matplotlib"],
+      description: "Complete Python data science toolkit: Pandas, NumPy, Matplotlib, Seaborn, and introductory ML.",
+      thumbnailColor: "#FF4D31", goalMatch: ["data", "ai", "ml"],
+      reasoning: "Builds the Python data manipulation foundations that underpin all your advanced AI/ML coursework."
+    },
+  ];
+
+  // Projects catalog
+  const allProjects = [
+    {
+      id: "proj-rag-engine", title: "Enterprise RAG Document Q&A Engine", difficulty: "Advanced",
+      estimatedHours: 40, skills: ["LangChain", "Vector DB", "FastAPI", "React"],
+      description: "Build a production RAG system with document ingestion, semantic chunking, hybrid search, and a chat UI.",
+      deliverable: "Deployed FastAPI + React app with PDF upload, vector search, and conversational Q&A",
+      goalMatch: ["ai", "generative", "llm"], matchScore: 97,
+      reasoning: "This project directly demonstrates the RAG pipeline skills that top AI companies look for — it's your strongest portfolio piece."
+    },
+    {
+      id: "proj-multi-agent", title: "Multi-Agent Research Assistant", difficulty: "Advanced",
+      estimatedHours: 35, skills: ["LangChain", "Tool Calling", "Python", "Agents"],
+      description: "Autonomous agents that search the web, synthesize documentation, and write technical reports with citations.",
+      deliverable: "Python CLI + API with autonomous research, summarization, and report generation",
+      goalMatch: ["ai", "generative", "agents"], matchScore: 94,
+      reasoning: "AI agent development is the most in-demand skill for 2026 — this project proves you can build autonomous systems."
+    },
+    {
+      id: "proj-saas-dashboard", title: "SaaS Analytics Dashboard", difficulty: "Intermediate",
+      estimatedHours: 30, skills: ["React", "Next.js", "PostgreSQL", "Chart.js"],
+      description: "Full-stack analytics dashboard with real-time data visualization, user authentication, and billing integration.",
+      deliverable: "Deployed Next.js SaaS app with charts, auth, and Stripe checkout",
+      goalMatch: ["web", "full stack", "frontend"], matchScore: 95,
+      reasoning: "SaaS dashboards are the bread-and-butter of full-stack roles — this demonstrates end-to-end product thinking."
+    },
+    {
+      id: "proj-ml-pipeline", title: "End-to-End ML Prediction Pipeline", difficulty: "Intermediate",
+      estimatedHours: 25, skills: ["Python", "Scikit-Learn", "Docker", "FastAPI"],
+      description: "Complete ML pipeline: data preprocessing, model training, hyperparameter tuning, API deployment, and monitoring.",
+      deliverable: "Dockerized prediction API with training pipeline and model registry",
+      goalMatch: ["ai", "ml", "data"], matchScore: 91,
+      reasoning: "Shows you can take a model from notebook to production — a critical skill that separates junior from senior ML engineers."
+    },
+    {
+      id: "proj-realtime-chat", title: "Real-Time Collaborative Chat App", difficulty: "Intermediate",
+      estimatedHours: 20, skills: ["React", "WebSockets", "Node.js", "Redis"],
+      description: "Build a real-time chat application with WebSocket channels, typing indicators, and message persistence.",
+      deliverable: "Real-time chat app with rooms, typing indicators, and message history",
+      goalMatch: ["web", "full stack", "backend"], matchScore: 88,
+      reasoning: "Real-time systems demonstrate advanced backend skills and WebSocket expertise valued in senior engineering roles."
+    },
+    {
+      id: "proj-automl-platform", title: "AutoML Training Platform", difficulty: "Advanced",
+      estimatedHours: 50, skills: ["Python", "PyTorch", "Optuna", "FastAPI", "React"],
+      description: "Platform where users upload datasets and get automatically trained, evaluated, and deployed ML models.",
+      deliverable: "Web UI + API for automated model training, evaluation comparison, and one-click deployment",
+      goalMatch: ["ai", "ml", "full stack"], matchScore: 93,
+      reasoning: "Combines your ML knowledge with full-stack engineering — exactly the intersection that AI product companies hire for."
+    },
+  ];
+
+  // Resources catalog
+  const allResources = [
+    {
+      id: "res-pytorch-docs", title: "PyTorch Official Documentation & Tutorials", type: "documentation",
+      provider: "PyTorch.org", tags: ["PyTorch", "Deep Learning", "Tutorials"],
+      description: "Comprehensive official tutorials covering tensor operations, autograd, model training, and deployment.",
+      goalMatch: ["ai", "ml", "deep learning"],
+      reasoning: "PyTorch docs are the primary reference for your deep learning training modules — bookmark for daily practice."
+    },
+    {
+      id: "res-arxiv-papers", title: "Key AI/ML Research Papers Reading List", type: "documentation",
+      provider: "arXiv / Papers With Code", tags: ["Research", "Papers", "State-of-the-Art"],
+      description: "Curated list of seminal and recent papers: Attention Is All You Need, BERT, GPT series, RLHF, and DPO.",
+      goalMatch: ["ai", "generative", "ml"],
+      reasoning: "Understanding foundational papers gives you the theoretical depth that top AI teams evaluate during interviews."
+    },
+    {
+      id: "res-lc-docs", title: "LangChain & LlamaIndex Documentation", type: "documentation",
+      provider: "LangChain / LlamaIndex", tags: ["LangChain", "RAG", "Agents", "LlamaIndex"],
+      description: "Official documentation for building LLM-powered applications: chains, agents, retrieval, and evaluation.",
+      goalMatch: ["ai", "generative", "llm", "agents"],
+      reasoning: "These are the core frameworks you'll use in your RAG and Agent projects — essential daily reference."
+    },
+    {
+      id: "res-mdn-web", title: "MDN Web Docs — Complete Web Reference", type: "documentation",
+      provider: "Mozilla Developer Network", tags: ["HTML", "CSS", "JavaScript", "Web APIs"],
+      description: "The authoritative reference for all web technologies: HTML, CSS, JavaScript, and Web APIs.",
+      goalMatch: ["web", "full stack", "frontend"],
+      reasoning: "MDN is the gold standard reference for web development — use it alongside your React & Next.js coursework."
+    },
+    {
+      id: "res-leetcode-patterns", title: "LeetCode Patterns for Technical Interviews", type: "tool",
+      provider: "LeetCode / NeetCode", tags: ["DSA", "Interview Prep", "Algorithms"],
+      description: "Curated problem sets organized by pattern: sliding window, two pointers, BFS/DFS, dynamic programming.",
+      goalMatch: ["ai", "web", "full stack", "backend", "data"],
+      reasoning: "Technical interviews at your target companies require strong algorithm skills — practice 3-5 problems/week."
+    },
+    {
+      id: "res-github-copilot", title: "GitHub Copilot for Accelerated Development", type: "tool",
+      provider: "GitHub", tags: ["AI Tools", "Productivity", "Code Generation"],
+      description: "AI-powered code completion that accelerates development speed by 30-50% across all programming tasks.",
+      goalMatch: ["ai", "web", "full stack", "backend"],
+      reasoning: "Copilot fluency is now an expected skill at modern companies — integrate it into your development workflow."
+    },
+    {
+      id: "res-system-design-primer", title: "System Design Primer — Interview Guide", type: "book",
+      provider: "GitHub (donnemartin)", tags: ["System Design", "Architecture", "Scalability"],
+      description: "Open-source guide covering load balancers, CDNs, databases, caching, and distributed system patterns.",
+      goalMatch: ["backend", "full stack", "ai", "ml"],
+      reasoning: "Your system design score is the lowest competency — this primer bridges the gap for senior-level interviews."
+    },
+    {
+      id: "res-huggingface", title: "Hugging Face Model Hub & Transformers Library", type: "tool",
+      provider: "Hugging Face", tags: ["Transformers", "Models", "NLP", "Fine-tuning"],
+      description: "Access 500K+ pre-trained models, datasets, and the Transformers library for fine-tuning and inference.",
+      goalMatch: ["ai", "generative", "ml", "nlp"],
+      reasoning: "Hugging Face is the de facto platform for accessing and deploying transformer models in production."
+    },
+  ];
+
+  // Score and filter recommendations based on profile match
+  function scoreItem(item: any): number {
+    let score = 50; // Base score
+    const goalMatches = item.goalMatch || [];
+    
+    // Goal matching (+30 max)
+    for (const gm of goalMatches) {
+      if (goal.includes(gm)) score += 15;
+    }
+    
+    // Skill gap matching (+20 max)
+    const itemTags = (item.tags || item.skills || []).map((t: string) => t.toLowerCase());
+    for (const gap of gapNames) {
+      if (itemTags.some((t: string) => gap.toLowerCase().includes(t) || t.includes(gap.toLowerCase()))) {
+        score += 10;
       }
-    ],
-    competencies: [
-      { name: "Python", score: 90, color: "#FF4D36" },
-      { name: "Machine Learning", score: 78, color: "#6A8D73" },
-      { name: "Generative AI", score: 62, color: "#E84A27" },
-      { name: "System Design", score: 41, color: "#8E9AAF" }
-    ]
+    }
+    
+    // Interest matching (+10 max)
+    for (const interest of interests) {
+      if (itemTags.some((t: string) => interest.toLowerCase().includes(t) || t.includes(interest.toLowerCase()))) {
+        score += 5;
+      }
+    }
+    
+    // Experience level alignment (+5)
+    if (item.level) {
+      if (experience === "beginner" && item.level === "Beginner") score += 5;
+      if (experience === "intermediate" && item.level === "Intermediate") score += 5;
+      if (experience === "advanced" && item.level === "Advanced") score += 5;
+    }
+    
+    return Math.min(99, score);
+  }
+
+  const courses = allCourses
+    .map(c => ({ ...c, matchScore: scoreItem(c) }))
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 6);
+
+  const projects = allProjects
+    .map(p => ({ ...p, matchScore: p.matchScore || scoreItem(p) }))
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 5);
+
+  const resources = allResources
+    .map(r => ({ ...r, matchScore: scoreItem(r) }))
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 6);
+
+  return {
+    courses: courses.map(c => ({
+      id: c.id, title: c.title, provider: c.provider, level: c.level,
+      durationHours: c.durationHours, matchScore: c.matchScore,
+      reasoning: c.reasoning, tags: c.tags, thumbnailColor: c.thumbnailColor,
+      description: c.description, dismissed: false
+    })),
+    projects: projects.map((p: any) => ({
+      id: p.id, title: p.title, difficulty: p.difficulty,
+      estimatedHours: p.estimatedHours, matchScore: p.matchScore,
+      reasoning: p.reasoning, skills: p.skills, description: p.description,
+      deliverable: p.deliverable, githubTemplateUrl: p.githubTemplateUrl || undefined, dismissed: false
+    })),
+    resources: resources.map((r: any) => ({
+      id: r.id, title: r.title, type: r.type, matchScore: r.matchScore,
+      reasoning: r.reasoning, tags: r.tags, description: r.description,
+      provider: r.provider, dismissed: false
+    }))
   };
 }
 
@@ -569,12 +919,35 @@ app.post("/api/onboarding/profile", authenticateToken, async (req: AuthRequest, 
   }
 });
 
+function getOrCreateUser(reqUser: { id?: string; email: string; name?: string; role?: string }): DbUser {
+  const normalizedEmail = (reqUser.email || '').toLowerCase().trim();
+  let user = usersDb.get(normalizedEmail) || usersDb.get(reqUser.email);
+  if (!user) {
+    user = {
+      id: reqUser.id || `user-${Date.now()}`,
+      name: reqUser.name || (reqUser.email ? reqUser.email.split('@')[0] : 'Alex Rivera'),
+      email: normalizedEmail,
+      passwordHash: '',
+      role: reqUser.role || 'Learner',
+      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      createdAt: new Date().toISOString(),
+      onboardingCompleted: true,
+      profile: {
+        targetGoal: "Generative AI Engineer",
+        experienceLevel: "intermediate",
+        knownSkills: ["Python", "SQL", "Machine Learning"],
+        weeklyHours: 12
+      }
+    };
+    user.roadmap = generateDefaultRoadmap(user.name, user.profile.targetGoal, user.profile.experienceLevel, user.profile.knownSkills, user.profile.weeklyHours);
+    usersDb.set(normalizedEmail, user);
+  }
+  return user;
+}
+
 // Roadmap: Get Current Roadmap
 app.get("/api/roadmap", authenticateToken, (req: AuthRequest, res) => {
-  const user = usersDb.get(req.user!.email);
-  if (!user) {
-    return res.status(404).json({ error: "User not found." });
-  }
+  const user = getOrCreateUser(req.user!);
 
   if (!user.roadmap) {
     user.roadmap = generateDefaultRoadmap(
@@ -592,9 +965,15 @@ app.get("/api/roadmap", authenticateToken, (req: AuthRequest, res) => {
 // Roadmap: Update Lesson completion or node progress
 app.post("/api/roadmap/update-lesson", authenticateToken, (req: AuthRequest, res) => {
   const { nodeId, lessonId, completed } = req.body;
-  const user = usersDb.get(req.user!.email);
-  if (!user || !user.roadmap) {
-    return res.status(404).json({ error: "Roadmap not found." });
+  const user = getOrCreateUser(req.user!);
+  if (!user.roadmap) {
+    user.roadmap = generateDefaultRoadmap(
+      user.name,
+      user.profile?.targetGoal || "Generative AI Engineer",
+      user.profile?.experienceLevel || "intermediate",
+      user.profile?.knownSkills || ["Python"],
+      user.profile?.weeklyHours || 12
+    );
   }
 
   let foundLesson = false;
@@ -620,12 +999,121 @@ app.post("/api/roadmap/update-lesson", authenticateToken, (req: AuthRequest, res
   return res.json({ success: true, roadmap: user.roadmap });
 });
 
-// AI Mentor: Chat endpoint (uses Gemini API when available, with intelligent fallback)
+// Recommendations: Get personalized recommendations
+app.get("/api/recommendations", authenticateToken, (req: AuthRequest, res) => {
+  const user = getOrCreateUser(req.user!);
+
+  if (!user.roadmap) {
+    user.roadmap = generateDefaultRoadmap(
+      user.name,
+      user.profile?.targetGoal || "AI/ML Engineer",
+      user.profile?.experienceLevel || "intermediate",
+      user.profile?.knownSkills || ["Python"],
+      user.profile?.weeklyHours || 12
+    );
+  }
+
+  const recs = generateRecommendations(user.profile, user.roadmap);
+  return res.json({
+    ...recs,
+    generatedAt: new Date().toISOString(),
+    profileSummary: {
+      targetGoal: user.profile?.targetGoal || "AI/ML Engineer",
+      experienceLevel: user.profile?.experienceLevel || "intermediate",
+      topSkillGaps: (user.roadmap?.skillGaps || []).slice(0, 3).map((g: any) => g.skill)
+    }
+  });
+});
+
+// Recommendations: Refresh recommendations
+app.post("/api/recommendations/refresh", authenticateToken, (req: AuthRequest, res) => {
+  const user = getOrCreateUser(req.user!);
+
+  if (!user.roadmap) {
+    user.roadmap = generateDefaultRoadmap(
+      user.name,
+      user.profile?.targetGoal || "AI/ML Engineer",
+      user.profile?.experienceLevel || "intermediate",
+      user.profile?.knownSkills || ["Python"],
+      user.profile?.weeklyHours || 12
+    );
+  }
+
+  const recs = generateRecommendations(user.profile, user.roadmap);
+  return res.json({
+    ...recs,
+    generatedAt: new Date().toISOString(),
+    profileSummary: {
+      targetGoal: user.profile?.targetGoal || "AI/ML Engineer",
+      experienceLevel: user.profile?.experienceLevel || "intermediate",
+      topSkillGaps: (user.roadmap?.skillGaps || []).slice(0, 3).map((g: any) => g.skill)
+    }
+  });
+});
+
+// Recommendations: Dismiss a recommendation
+app.post("/api/recommendations/dismiss", authenticateToken, (req: AuthRequest, res) => {
+  const { id, type } = req.body;
+  return res.json({ success: true, dismissed: { id, type } });
+});
+
+// Roadmap: Generate fresh roadmap from profile & custom options
+app.post("/api/roadmap/generate", authenticateToken, (req: AuthRequest, res) => {
+  const user = getOrCreateUser(req.user!);
+  const { targetGoal, experienceLevel, weeklyHours } = req.body || {};
+
+  if (targetGoal) {
+    if (!user.profile) {
+      user.profile = {
+        targetGoal,
+        experienceLevel: experienceLevel || 'intermediate',
+        knownSkills: ['Python'],
+        weeklyHours: weeklyHours || 12
+      };
+    } else {
+      user.profile.targetGoal = targetGoal;
+      if (experienceLevel) user.profile.experienceLevel = experienceLevel;
+      if (weeklyHours) user.profile.weeklyHours = Number(weeklyHours);
+    }
+  }
+
+  const roadmap = generateDefaultRoadmap(
+    user.name,
+    targetGoal || user.profile?.targetGoal || "AI/ML Engineer",
+    experienceLevel || user.profile?.experienceLevel || "intermediate",
+    user.profile?.knownSkills || ["Python"],
+    weeklyHours || user.profile?.weeklyHours || 12
+  );
+  user.roadmap = roadmap;
+
+  return res.json(roadmap);
+});
+
+// AI Mentor: Enhanced chat endpoint with full profile context
 app.post("/api/mentor/chat", async (req: Request, res: Response) => {
   try {
     const { message, context } = req.body;
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
+    }
+
+    // Try to get user profile for context enrichment
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let userProfile: any = null;
+    let userRoadmap: any = null;
+    let userRecommendations: any = null;
+
+    if (token) {
+      try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        const user = usersDb.get(decoded.email);
+        if (user) {
+          userProfile = user.profile;
+          userRoadmap = user.roadmap;
+          userRecommendations = generateRecommendations(user.profile, user.roadmap);
+        }
+      } catch (e) { /* token verification failed, proceed without profile */ }
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -640,15 +1128,49 @@ app.post("/api/mentor/chat", async (req: Request, res: Response) => {
           }
         });
 
-        const systemInstruction = `You are PathAI, an elite AI mentor for a high-performance personalized learning platform. 
-Your goal is to guide learners to achieve their career objectives with clarity, precision, sequence recommendations, and actionable learning milestones.
-Keep your tone encouraging, insightful, and structured. 
-Highlight the exact next step, prerequisite relationships, and practical project ideas.
-Keep responses concise (150-250 words) with clear bullet points.`;
+        // Build profile-aware system instruction
+        const profileContext = userProfile ? `
+LEARNER PROFILE:
+- Career Goal: ${userProfile.targetGoal || "Not specified"}
+- Experience Level: ${userProfile.experienceLevel || "intermediate"}
+- Known Skills: ${(userProfile.knownSkills || []).join(", ") || "Not specified"}
+- Weekly Hours: ${userProfile.weeklyHours || 10} hours/week
+- Education: ${userProfile.educationDegree || "Not specified"} ${userProfile.educationMajor || ""}
+- Technical Interests: ${(userProfile.technicalInterests || []).join(", ") || "Not specified"}
+- Target Timeline: ${userProfile.targetCompletionMonths || "Not specified"} months
+` : "";
+
+        const roadmapContext = userRoadmap ? `
+CURRENT PROGRESS:
+- Overall Progress: ${userRoadmap.overallProgress}%
+- Current Milestone: ${userRoadmap.currentMilestone}
+- Competencies: ${(userRoadmap.competencies || []).map((c: any) => `${c.name}: ${c.score}%`).join(", ")}
+- Skill Gaps: ${(userRoadmap.skillGaps || []).map((g: any) => `${g.skill} (${g.currentLevel}% → ${g.targetLevel}%)`).join(", ")}
+` : "";
+
+        const recsContext = userRecommendations ? `
+TOP RECOMMENDATIONS (with reasoning):
+Courses: ${userRecommendations.courses.slice(0, 3).map((c: any) => `"${c.title}" - ${c.reasoning}`).join("; ")}
+Projects: ${userRecommendations.projects.slice(0, 2).map((p: any) => `"${p.title}" - ${p.reasoning}`).join("; ")}
+` : "";
+
+        const systemInstruction = `You are PathAI, an elite AI career mentor with deep knowledge of this specific learner's profile, progress, and personalized recommendations.
+
+${profileContext}
+${roadmapContext}
+${recsContext}
+
+YOUR CAPABILITIES:
+1. **Explain Recommendations**: When asked "why was X recommended?", reference the specific reasoning from their profile match.
+2. **Progress Guidance**: Provide specific next steps based on their current milestone and skill gaps.
+3. **Skill Explanations**: Break down technical concepts at their experience level.
+4. **Career Strategy**: Advise on portfolio building, interview prep, and timeline optimization.
+
+Keep responses concise (150-300 words), encouraging, and actionable with bullet points. Always reference specific data from their profile when relevant.`;
 
         const response = await ai.models.generateContent({
           model: "gemini-3.7-flash",
-          contents: `Learner message: "${message}". Context: Goal: ${context?.targetGoal || "AI Engineer"}, Current Stage: ${context?.currentMilestone || "Deep Learning"}. Provide strategic guidance and recommended next step.`,
+          contents: `Learner asks: "${message}". Current stage: ${context?.currentMilestone || userRoadmap?.currentMilestone || "Deep Learning"}.`,
           config: {
             systemInstruction
           }
@@ -658,7 +1180,7 @@ Keep responses concise (150-250 words) with clear bullet points.`;
           return res.json({
             reply: response.text,
             suggestedActions: [
-              { label: "View Recommended Labs", actionType: "navigate", payload: "/learning-path" },
+              { label: "View Recommendations", actionType: "navigate", payload: "/recommendations" },
               { label: "Take Skill Assessment", actionType: "start-quiz", payload: "vector-search" }
             ]
           });
@@ -668,15 +1190,32 @@ Keep responses concise (150-250 words) with clear bullet points.`;
       }
     }
 
-    // Smart contextual fallback
+    // Enhanced contextual fallback with profile awareness
     const lower = message.toLowerCase();
-    let reply = "Based on your current progress and goals, you're building solid momentum! ";
+    const goalText = userProfile?.targetGoal || context?.targetGoal || "AI/ML Engineer";
+    const competencies = userRoadmap?.competencies || [];
+    const gaps = userRoadmap?.skillGaps || [];
+    
+    let reply = "";
     let suggestions = [
-      { label: "View Dynamic Roadmap", actionType: "navigate", payload: "/learning-path" },
+      { label: "View Recommendations", actionType: "navigate", payload: "/recommendations" },
       { label: "Assess Skill Gaps", actionType: "start-quiz", payload: "rag-systems" }
     ];
 
-    if (lower.includes("rag") || lower.includes("vector") || lower.includes("embedding")) {
+    if (lower.includes("why") && lower.includes("recommend")) {
+      // Handle "why was X recommended?" queries
+      const topCourse = userRecommendations?.courses?.[0];
+      const topProject = userRecommendations?.projects?.[0];
+      reply = `Great question! Here's why your top recommendations were selected:
+
+**📚 ${topCourse?.title || "Deep Learning Specialization"}**
+${topCourse?.reasoning || "Directly maps to your career goal and addresses key skill gaps."}
+
+**🛠️ ${topProject?.title || "Enterprise RAG Document Q&A Engine"}**
+${topProject?.reasoning || "Demonstrates the production skills that hiring managers prioritize."}
+
+Your recommendations are personalized based on your **${goalText}** goal, current competencies, and skill gaps. Each one is scored against your profile for maximum relevance.`;
+    } else if (lower.includes("rag") || lower.includes("vector") || lower.includes("embedding")) {
       reply = `**Strategic Sequence for RAG Mastery:**
 1. **Embedding Models**: Understand cosine similarity, normalized dot products, and token limits.
 2. **Chunking & Metadata**: Implement semantic chunking with recursive boundary splitting.
@@ -684,25 +1223,53 @@ Keep responses concise (150-250 words) with clear bullet points.`;
 4. **Hybrid Search**: Combine BM25 keyword search with dense semantic retrieval for high-accuracy recall.
 
 👉 *Next Action:* Dive into the **Vector Database Optimization** lab to build your production retrieval pipeline.`;
+    } else if (lower.includes("progress") || lower.includes("how am i doing") || lower.includes("status")) {
+      const progress = userRoadmap?.overallProgress || 68;
+      const compSummary = competencies.map((c: any) => `• **${c.name}**: ${c.score}%`).join("\n");
+      reply = `📊 **Your Learning Progress Summary:**
+
+**Overall Mastery**: ${progress}% complete on your **${goalText}** path
+
+**Competency Breakdown:**
+${compSummary || "• Python: 90%\n• Machine Learning: 78%\n• Generative AI: 62%\n• System Design: 41%"}
+
+**Priority Gap**: ${gaps[0]?.skill || "System Design"} (${gaps[0]?.currentLevel || 41}% → ${gaps[0]?.targetLevel || 85}%)
+
+You're making excellent progress! Focus your next sessions on closing the ${gaps[0]?.skill || "System Design"} gap.`;
+    } else if (lower.includes("project") || lower.includes("portfolio")) {
+      reply = `**Top 2 High-Impact Portfolio Projects for ${goalText}:**
+1. **${userRecommendations?.projects?.[0]?.title || "Multi-Agent Research Assistant"}**: ${userRecommendations?.projects?.[0]?.reasoning || "Autonomous agents that demonstrate production AI engineering skills."}
+2. **${userRecommendations?.projects?.[1]?.title || "Production RAG Engine with Evaluator"}**: ${userRecommendations?.projects?.[1]?.reasoning || "End-to-end Q&A pipeline benchmarked against industry metrics."}`;
     } else if (lower.includes("python") || lower.includes("start") || lower.includes("beginner")) {
-      reply = `You already have strong Python foundations! Rather than repeating beginner syntax, focus on:
+      reply = `Based on your profile (${userProfile?.experienceLevel || "intermediate"} level), here's my recommendation:
+
+${(userProfile?.experienceLevel || "intermediate") !== "beginner" ? 
+`You already have strong Python foundations! Rather than repeating beginner syntax, focus on:
 - **AsyncIO & Fast concurrency** for low-latency model calls
 - **Type hints & Pydantic models** for robust AI schemas
-- **Vectorized operations in NumPy** for custom tensor manipulation.
+- **Vectorized operations in NumPy** for custom tensor manipulation
 
-You are ready to advance directly to **PyTorch Autograd & Transformer Architectures**.`;
-    } else if (lower.includes("project") || lower.includes("portfolio")) {
-      reply = `**Top 2 High-Impact Portfolio Projects for your goal:**
-1. **Multi-Agent Research Assistant**: Autonomous agents that search the web, synthesize documentation, and write technical reports.
-2. **Production RAG Engine with Evaluator**: End-to-end question answering pipeline benchmarked against standard RAG Triad metrics (Faithfulness, Answer Relevance, Context Precision).`;
+You are ready to advance directly to **PyTorch Autograd & Transformer Architectures**.` :
+`Start with the fundamentals:
+- **Python data types & control flow** — build a solid foundation
+- **Functions & modules** — organize code professionally
+- **List comprehensions & generators** — write Pythonic code
+
+Your recommended course: **Python for Data Science & Machine Learning** on Udemy.`}`;
     } else {
-      reply = `You're currently past foundational concepts and entering the **Deep Learning & Applied Generative AI** stage. 
+      const currentMilestone = userRoadmap?.currentMilestone || "Deep Learning Foundations";
+      reply = `Based on your **${goalText}** profile and current progress:
 
-Based on your profile:
-• **Strength**: Python (90%) and ML Foundations (78%)
-• **Critical Gap to Close**: Vector indexing & Hybrid Search (32% → 85%)
+• **Current Stage**: ${currentMilestone}
+• **Strongest Skill**: ${competencies[0]?.name || "Python"} (${competencies[0]?.score || 90}%)
+• **Critical Gap**: ${gaps[0]?.skill || "System Design"} (${gaps[0]?.currentLevel || 41}% → ${gaps[0]?.targetLevel || 85}%)
 
-I recommend dedicating your next 3 learning hours to **Building a Self-Healing Code Assistant** project.`;
+**Recommended Next Steps:**
+1. Complete your current milestone: **${currentMilestone}**
+2. Start the top-priority skill gap module
+3. Build the **${userRecommendations?.projects?.[0]?.title || "Enterprise RAG Document Q&A Engine"}** project
+
+Ask me about any specific topic, and I'll provide a detailed learning sequence!`;
     }
 
     return res.json({
