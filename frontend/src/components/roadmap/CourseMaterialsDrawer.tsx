@@ -12,7 +12,7 @@ export const CourseMaterialsDrawer: React.FC<CourseMaterialsDrawerProps> = ({ st
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([
     {
       sender: 'ai',
-      text: 'Hi! Ask me anything about your learning roadmap, prerequisites, or why specific skills are required for your target role.',
+      text: 'Hi ! Ask me anything about your learning roadmap, prerequisites, or why specific skills are required for your target role.',
     },
   ]);
 
