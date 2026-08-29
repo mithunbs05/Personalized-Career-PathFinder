@@ -620,99 +620,765 @@ app.post("/api/roadmap/update-lesson", authenticateToken, (req: AuthRequest, res
   return res.json({ success: true, roadmap: user.roadmap });
 });
 
-// AI Mentor: Chat endpoint (uses Gemini API when available, with intelligent fallback)
-app.post("/api/mentor/chat", async (req: Request, res: Response) => {
-  try {
-    const { message, context } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "Message is required." });
+// ===========================================================================
+// AI MENTOR — SERVER-SIDE INTELLIGENCE & ENDPOINTS
+// ===========================================================================
+
+interface MentorDbSession {
+  id: string;
+  userId: string;
+  domain: string;
+  skill: string;
+  skillId: string;
+  topic: string | null;
+  roadmapStage: string;
+  mode: 'learn' | 'practice' | 'assess';
+  startedAt: string;
+  status: 'active' | 'completed';
+}
+
+interface MentorDbMessage {
+  id: string;
+  sessionId: string;
+  userId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  metadata?: any;
+  createdAt: string;
+}
+
+interface MentorDbAssessment {
+  id: string;
+  sessionId?: string;
+  userId: string;
+  skill: string;
+  topic?: string | null;
+  serverQuestions: Array<{
+    id: string;
+    text: string;
+    options: string[];
+    correctAnswer: number;
+    explanation: string;
+  }>;
+  score?: number;
+  completedAt?: string;
+}
+
+const mentorSessionsDb = new Map<string, MentorDbSession>();
+const mentorMessagesDb = new Map<string, MentorDbMessage[]>();
+const mentorAssessmentsDb = new Map<string, MentorDbAssessment>();
+const userTopicProgressDb = new Map<string, Map<string, { mastery: number; attempts: number; correct: number; lastAssessed: string }>>();
+
+const MENTOR_CANONICAL_STAGES = [
+  { id: 1, title: "Programming Foundations", order: 1, status: "COMPLETED", skills: ["Data Types", "Loops", "Functions", "Algorithmic Complexity"], prerequisites: [] },
+  { id: 2, title: "Python for AI", order: 2, status: "COMPLETED", skills: ["Python OOP", "NumPy & Pandas"], prerequisites: ["Programming Foundations"] },
+  { id: 3, title: "Mathematics & Statistics", order: 3, status: "IN_PROGRESS", skills: ["Linear Algebra", "Calculus", "Probability", "Optimization"], prerequisites: ["Python for AI"] },
+  { id: 4, title: "Machine Learning", order: 4, status: "NOT_STARTED", skills: ["Regression Models", "Random Forests", "XGBoost", "Model Evaluation"], prerequisites: ["Mathematics & Statistics"] },
+  { id: 5, title: "Deep Learning", order: 5, status: "LOCKED", skills: ["PyTorch", "Backpropagation", "CNNs & Vision", "RNNs & Sequence Models"], prerequisites: ["Machine Learning"] },
+  { id: 6, title: "Generative AI & LLMs", order: 6, status: "LOCKED", skills: ["Transformers", "Tokenization", "RAG Systems", "Vector Databases", "Prompt Engineering"], prerequisites: ["Deep Learning"] }
+];
+
+const MENTOR_CANONICAL_SKILLS = [
+  { id: "s1", name: "Python OOP", domain: "Foundations & Core Python", level: "Advanced", progress: 95, isVerified: true },
+  { id: "s2", name: "NumPy & Pandas", domain: "Foundations & Core Python", level: "Advanced", progress: 88, isVerified: true },
+  { id: "s3", name: "Algorithmic Complexity", domain: "Foundations & Core Python", level: "Developing", progress: 45, isVerified: false },
+  { id: "s4", name: "Linear Algebra", domain: "Math & Statistics", level: "Developing", progress: 45, isVerified: false },
+  { id: "s5", name: "Calculus", domain: "Math & Statistics", level: "Developing", progress: 30, isVerified: false },
+  { id: "s6", name: "Probability", domain: "Math & Statistics", level: "Intermediate", progress: 60, isVerified: true },
+  { id: "s7", name: "Optimization", domain: "Math & Statistics", level: "Novice", progress: 10, isVerified: false },
+  { id: "s8", name: "Regression Models", domain: "Machine Learning", level: "Intermediate", progress: 75, isVerified: true },
+  { id: "s9", name: "Random Forests", domain: "Machine Learning", level: "Intermediate", progress: 65, isVerified: false },
+  { id: "s10", name: "XGBoost", domain: "Machine Learning", level: "Novice", progress: 20, isVerified: false },
+  { id: "s11", name: "Model Evaluation", domain: "Machine Learning", level: "Developing", progress: 55, isVerified: false },
+  { id: "s12", name: "Transformers", domain: "Generative AI", level: "Novice", progress: 15, isVerified: false },
+  { id: "s13", name: "Tokenization", domain: "Generative AI", level: "Developing", progress: 40, isVerified: false },
+  { id: "s14", name: "RAG Systems", domain: "Generative AI", level: "Developing", progress: 35, isVerified: false },
+  { id: "s15", name: "Vector Databases", domain: "Generative AI", level: "Novice", progress: 25, isVerified: false },
+];
+
+const MENTOR_TOPIC_HIERARCHY: Record<string, string[]> = {
+  "Linear Algebra": ["Matrix Operations", "Eigenvalues & Eigenvectors", "Vector Spaces", "SVD"],
+  "Calculus": ["Partial Derivatives", "Gradient Descent", "Chain Rule", "Hessian Matrices"],
+  "Probability": ["Bayes' Theorem", "Continuous Distributions", "Expectation & Variance", "Maximum Likelihood"],
+  "Optimization": ["Convexity", "Adam Optimizer", "Learning Rate Schedules", "Stochastic Gradient Descent"],
+  "Regression Models": ["Linear Regression", "L1/L2 Regularization", "Cost Functions", "Residual Analysis"],
+  "Transformers": ["Self-Attention Mechanism", "Multi-Head Attention", "Positional Encoding", "KV Caching"],
+  "Tokenization": ["Byte-Pair Encoding", "WordPiece", "SentencePiece", "Special Tokens"],
+  "RAG Systems": ["Semantic Chunking", "Hybrid Search", "Re-Ranking Pipelines", "RAG Triad Evaluation"],
+  "Vector Databases": ["HNSW Indexing", "Cosine Similarity", "Embedding Alignment", "Metadata Filtering"],
+};
+
+const MENTOR_QUESTION_BANK: Record<string, Array<{ id: string; text: string; options: string[]; correctAnswer: number; explanation: string }>> = {
+  "Linear Algebra": [
+    { id: "la-1", text: "What is the dimension of the resulting matrix when multiplying a 3×2 matrix by a 2×4 matrix?", options: ["3×4", "2×3", "3×2", "Cannot be multiplied"], correctAnswer: 0, explanation: "Matrix multiplication (M×K) × (K×N) yields a matrix of dimensions M×N. Here, (3×2) × (2×4) = 3×4." },
+    { id: "la-2", text: "What does it mean if the determinant of a square matrix is zero?", options: ["The matrix is orthogonal", "The matrix is non-invertible (singular)", "The matrix has all zero eigenvalues", "The matrix is symmetric"], correctAnswer: 1, explanation: "A determinant of 0 indicates that the matrix compresses space into a lower dimension, making it singular and non-invertible." },
+    { id: "la-3", text: "What is an eigenvector of a square matrix A?", options: ["A vector that becomes zero when multiplied by A", "A non-zero vector that only scales by a scalar λ when multiplied by A (Av = λv)", "A vector with all equal components", "The inverse of matrix A"], correctAnswer: 1, explanation: "An eigenvector only changes in magnitude (scaled by eigenvalue λ) without changing its directional line: Av = λv." },
+    { id: "la-4", text: "What does Principal Component Analysis (PCA) utilize to find directions of maximum variance?", options: ["Matrix determinant", "Eigenvectors of the covariance matrix", "Cross-entropy loss", "LU Decomposition"], correctAnswer: 1, explanation: "PCA computes eigenvectors of the data covariance matrix; principal axes correspond to highest eigenvalues." },
+    { id: "la-5", text: "What is the dot product of two orthogonal vectors?", options: ["1", "0", "-1", "Infinity"], correctAnswer: 1, explanation: "Two vectors are orthogonal if and only if their inner/dot product equals 0." }
+  ],
+  "Calculus": [
+    { id: "calc-1", text: "In gradient descent, in which direction do we update model parameters to minimize loss?", options: ["In the direction of the gradient", "Opposite to the direction of the gradient (-∇L)", "Perpendicular to the gradient", "Random direction"], correctAnswer: 1, explanation: "The gradient ∇L points in the direction of steepest ascent. To minimize loss, parameters step in the opposite direction: θ ← θ - α∇L." },
+    { id: "calc-2", text: "What calculus rule is the backbone of backpropagation in deep neural networks?", options: ["Product rule", "Chain rule of differentiation", "L'Hôpital's rule", "Fundamental Theorem of Calculus"], correctAnswer: 1, explanation: "Backpropagation applies the chain rule systematically to compute loss gradients with respect to each weight." },
+    { id: "calc-3", text: "What does a partial derivative ∂f/∂x represent for a multivariable function f(x, y)?", options: ["The rate of change of f with respect to x while keeping y constant", "The sum of derivatives of x and y", "The area under f along the x-axis", "The second derivative with respect to x"], correctAnswer: 0, explanation: "A partial derivative measures the rate of change along one variable axis while holding all others constant." },
+    { id: "calc-4", text: "What does the Hessian matrix contain?", options: ["First-order partial derivatives", "Second-order partial derivatives", "Eigenvalues of the loss function", "Inverse gradient vectors"], correctAnswer: 1, explanation: "The Hessian matrix contains all second-order partial derivatives, capturing the local curvature of the loss surface." },
+    { id: "calc-5", text: "What happens if the learning rate α in gradient descent is too large?", options: ["The model converges instantaneously", "The algorithm may oscillate or diverge uncontrollably", "The gradients become exactly zero", "Weights freeze at initial values"], correctAnswer: 1, explanation: "An excessively large learning rate overshoots the minimum and can cause the loss to diverge." }
+  ],
+  "Probability": [
+    { id: "prob-1", text: "According to Bayes' Theorem, what is P(A|B)?", options: ["P(B|A) * P(A) / P(B)", "P(A) * P(B) / P(B|A)", "P(A) + P(B) - P(A ∩ B)", "P(A ∩ B) * P(B)"], correctAnswer: 0, explanation: "Bayes' Theorem relates conditional probability P(A|B) = [P(B|A) * P(A)] / P(B)." },
+    { id: "prob-2", text: "In a standard normal distribution, approximately what percentage of data falls within ±1 standard deviation of the mean?", options: ["50%", "68.2%", "95.4%", "99.7%"], correctAnswer: 1, explanation: "By the empirical rule (68-95-99.7), approximately 68.2% of data in a normal distribution lies within ±1σ of the mean." },
+    { id: "prob-3", text: "What does Maximum Likelihood Estimation (MLE) aim to maximize?", options: ["The learning rate", "The probability of observing the given dataset under the model parameters", "The model complexity", "The cross-validation split ratio"], correctAnswer: 1, explanation: "MLE seeks parameter values θ that maximize the likelihood of the observed dataset." }
+  ],
+  "Transformers": [
+    { id: "tf-1", text: "In self-attention Attention(Q, K, V) = softmax(QK^T / √d_k)V, why is the dot product scaled by √d_k?", options: ["To increase parameter count", "To prevent dot products from growing large and pushing softmax into vanishing gradients", "To ensure outputs are binary", "To align dimensions for matrix multiplication"], correctAnswer: 1, explanation: "Scaling by √d_k prevents large values that push softmax into regions with extremely small gradients." },
+    { id: "tf-2", text: "Why do transformer architectures require Positional Encodings?", options: ["To compress the input tokens", "Because self-attention is permutation-invariant and has no inherent sense of word order", "To initialize attention weights", "To speed up matrix multiplication on GPUs"], correctAnswer: 1, explanation: "Self-attention computes token relationships simultaneously regardless of position. Positional encodings inject sequence order." },
+    { id: "tf-3", text: "What is the primary benefit of KV (Key-Value) Caching during LLM text generation?", options: ["It reduces vocabulary size", "It avoids recomputing Key and Value vectors for previously processed prompt and output tokens", "It enables training on smaller GPUs", "It replaces the attention mechanism with convolution"], correctAnswer: 1, explanation: "KV caching preserves computed key and value tensors across autoregressive generation steps." }
+  ]
+};
+
+// Priority Calculation Engine (Deterministic)
+function serverCalculateTodaysFocus(userId: string, targetRole: string = "AI/ML Engineer"): {
+  domain: string;
+  skill: string;
+  skillId: string;
+  topic: string | null;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  mastery: number;
+  estimatedMinutes: number;
+  reason: string;
+  blocksStage: string | null;
+} {
+  const currentStage = MENTOR_CANONICAL_STAGES.find(s => s.status === 'IN_PROGRESS') || MENTOR_CANONICAL_STAGES[2];
+  const nextStage = MENTOR_CANONICAL_STAGES.find(s => s.status === 'NOT_STARTED') || MENTOR_CANONICAL_STAGES[3];
+
+  const userProgress = userTopicProgressDb.get(userId);
+
+  const scored: Array<{
+    skill: string;
+    skillId: string;
+    domain: string;
+    mastery: number;
+    score: number;
+    reason: string;
+    blocksStage: string | null;
+  }> = [];
+
+  for (const skillName of currentStage.skills) {
+    const canonical = MENTOR_CANONICAL_SKILLS.find(s => s.name.toLowerCase() === skillName.toLowerCase());
+    if (!canonical) continue;
+
+    let mastery = canonical.progress;
+    if (userProgress && userProgress.has(canonical.id)) {
+      mastery = userProgress.get(canonical.id)!.mastery;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build'
-            }
-          }
-        });
+    if (mastery >= 90) continue;
 
-        const systemInstruction = `You are PathAI, an elite AI mentor for a high-performance personalized learning platform. 
-Your goal is to guide learners to achieve their career objectives with clarity, precision, sequence recommendations, and actionable learning milestones.
-Keep your tone encouraging, insightful, and structured. 
-Highlight the exact next step, prerequisite relationships, and practical project ideas.
-Keep responses concise (150-250 words) with clear bullet points.`;
+    const gap = 100 - mastery;
+    let score = gap * 0.5 + 15;
+    let blocksStage: string | null = null;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: `Learner message: "${message}". Context: Goal: ${context?.targetGoal || "AI Engineer"}, Current Stage: ${context?.currentMilestone || "Deep Learning"}. Provide strategic guidance and recommended next step.`,
-          config: {
-            systemInstruction
-          }
-        });
+    if (nextStage) {
+      score += 30;
+      blocksStage = nextStage.title;
+    }
 
-        if (response.text) {
-          return res.json({
-            reply: response.text,
-            suggestedActions: [
-              { label: "View Recommended Labs", actionType: "navigate", payload: "/learning-path" },
-              { label: "Take Skill Assessment", actionType: "start-quiz", payload: "vector-search" }
-            ]
-          });
+    if (mastery < 30) score += 20;
+    else if (mastery < 50) score += 10;
+    if (!canonical.isVerified) score += 5;
+
+    const reason = blocksStage
+      ? `Prerequisite for upcoming "${blocksStage}" stage with a ${gap}% mastery gap`
+      : `Part of your active "${currentStage.title}" stage — needs focused practice`;
+
+    scored.push({
+      skill: canonical.name,
+      skillId: canonical.id,
+      domain: canonical.domain,
+      mastery,
+      score,
+      reason,
+      blocksStage
+    });
+  }
+
+  if (scored.length === 0) {
+    return {
+      domain: "Math & Statistics",
+      skill: "Linear Algebra",
+      skillId: "s4",
+      topic: "Matrix Operations",
+      priority: "HIGH",
+      mastery: 45,
+      estimatedMinutes: 45,
+      reason: "Prerequisite for Machine Learning stage",
+      blocksStage: "Machine Learning"
+    };
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored[0];
+
+  const priorityTier: 'HIGH' | 'MEDIUM' | 'LOW' = top.score >= 60 ? 'HIGH' : top.score >= 35 ? 'MEDIUM' : 'LOW';
+  const estMins = top.mastery < 30 ? 60 : top.mastery < 60 ? 45 : 30;
+  const subtopic = MENTOR_TOPIC_HIERARCHY[top.skill] ? MENTOR_TOPIC_HIERARCHY[top.skill][0] : null;
+
+  return {
+    domain: top.domain,
+    skill: top.skill,
+    skillId: top.skillId,
+    topic: subtopic,
+    priority: priorityTier,
+    mastery: top.mastery,
+    estimatedMinutes: estMins,
+    reason: top.reason,
+    blocksStage: top.blocksStage
+  };
+}
+
+// Universal AI Caller (OpenAI / Gemini / Fallback)
+async function callAIBackend(options: {
+  systemPrompt: string;
+  userPrompt: string;
+  history?: Array<{ role: string; content: string }>;
+  temperature?: number;
+  jsonMode?: boolean;
+}): Promise<string> {
+  const { systemPrompt, userPrompt, history = [], temperature = 0.5, jsonMode = false } = options;
+
+  // 1. Try Gemini if GEMINI_API_KEY is available
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+      const contents = history.map(h => `${h.role}: ${h.content}`).concat([`user: ${userPrompt}`]).join('\n');
+      const res = await ai.models.generateContent({
+        model: "gemini-3.7-flash",
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          ...(jsonMode ? { responseMimeType: "application/json" } : {})
         }
-      } catch (geminiErr) {
-        console.warn("Gemini API call skipped or errored, falling back to deterministic response:", geminiErr);
+      });
+      if (res.text) return res.text;
+    } catch (geminiErr) {
+      console.warn("Gemini call failed in mentor service, trying OpenAI backend:", geminiErr);
+    }
+  }
+
+  // 2. Try OpenAI gpt-4.1-nano
+  const openAiKey = process.env.OPENAI_API_KEY;
+  const openAiBase = process.env.OPENAI_API_BASE_URL || "https://api.openai.com/v1";
+  if (openAiKey) {
+    try {
+      const url = openAiBase.replace(/\/+$/, '') + '/chat/completions';
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-6).map(h => ({ role: h.role === 'ai' ? 'assistant' : h.role, content: h.content })),
+        { role: 'user', content: userPrompt }
+      ];
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openAiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-nano',
+          messages,
+          temperature,
+          ...(jsonMode ? { response_format: { type: "json_object" } } : {})
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) return content;
+      }
+    } catch (openAiErr) {
+      console.warn("OpenAI call failed in mentor service, using deterministic fallback:", openAiErr);
+    }
+  }
+
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// AI Mentor Express API Endpoints
+// ---------------------------------------------------------------------------
+
+// GET /api/mentor/context
+app.get("/api/mentor/context", (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let userId = "user-demo-101";
+    let userName = "Alex Rivera";
+    let targetRole = "AI/ML Engineer";
+
+    if (token) {
+      try {
+        const decoded: any = jwt.decode(token);
+        if (decoded?.id) userId = decoded.id;
+        if (decoded?.name) userName = decoded.name;
+      } catch (e) {}
+    }
+
+    const focus = serverCalculateTodaysFocus(userId, targetRole);
+    const userProgress = userTopicProgressDb.get(userId);
+
+    const relevantSkills = MENTOR_CANONICAL_SKILLS.map(s => {
+      let mastery = s.progress;
+      if (userProgress && userProgress.has(s.id)) {
+        mastery = userProgress.get(s.id)!.mastery;
+      }
+      return { ...s, progress: mastery };
+    });
+
+    return res.json({
+      user_id: userId,
+      user_name: userName,
+      target_role: targetRole,
+      current_stage: "Mathematics & Statistics",
+      current_stage_order: 3,
+      current_stage_progress: 65,
+      overall_mastery: 50,
+      focus,
+      relevant_skills: relevantSkills,
+      recent_assessments: []
+    });
+  } catch (error) {
+    console.error("Mentor context error:", error);
+    return res.status(500).json({ error: "Failed to load mentor context" });
+  }
+});
+
+// GET /api/mentor/focus
+app.get("/api/mentor/focus", (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let userId = "user-demo-101";
+    if (token) {
+      try {
+        const decoded: any = jwt.decode(token);
+        if (decoded?.id) userId = decoded.id;
+      } catch (e) {}
+    }
+    const focus = serverCalculateTodaysFocus(userId);
+    return res.json(focus);
+  } catch (error) {
+    console.error("Mentor focus error:", error);
+    return res.status(500).json({ error: "Failed to calculate focus" });
+  }
+});
+
+// POST /api/mentor/sessions
+app.post("/api/mentor/sessions", async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let userId = "user-demo-101";
+    let userName = "Alex Rivera";
+    if (token) {
+      try {
+        const decoded: any = jwt.decode(token);
+        if (decoded?.id) userId = decoded.id;
+        if (decoded?.name) userName = decoded.name;
+      } catch (e) {}
+    }
+
+    const { mode = 'learn', domain, skill, topic, roadmapStage } = req.body;
+    const focus = serverCalculateTodaysFocus(userId);
+
+    const sessionId = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const session: MentorDbSession = {
+      id: sessionId,
+      userId,
+      domain: domain || focus.domain,
+      skill: skill || focus.skill,
+      skillId: focus.skillId,
+      topic: topic || focus.topic,
+      roadmapStage: roadmapStage || "Mathematics & Statistics",
+      mode: mode as any,
+      startedAt: new Date().toISOString(),
+      status: 'active'
+    };
+
+    mentorSessionsDb.set(sessionId, session);
+
+    const openingText = `🎯 **${mode.charAt(0).toUpperCase() + mode.slice(1)} Session Started: ${session.skill}**\n\n` +
+      `You're focusing on **${session.skill}** (${focus.mastery}% mastery) in **${session.domain}**.\n\n` +
+      `📌 *${focus.reason}*.\n\n` +
+      (mode === 'learn'
+        ? `Let's break down the core intuition and build your foundation step-by-step. What specific concept in ${session.skill} would you like to explore first?`
+        : mode === 'practice'
+        ? `I will generate interactive practice challenges matched to your mastery level. Let's get started!`
+        : `I will test your understanding with focused diagnostic questions. Ready? Click Start Session below!`);
+
+    const openingMsg: MentorDbMessage = {
+      id: `msg-${Date.now()}`,
+      sessionId,
+      userId,
+      role: 'assistant',
+      content: openingText,
+      createdAt: new Date().toISOString()
+    };
+
+    mentorMessagesDb.set(sessionId, [openingMsg]);
+
+    return res.json({
+      id: sessionId,
+      user_id: userId,
+      domain: session.domain,
+      skill: session.skill,
+      skill_id: session.skillId,
+      topic: session.topic,
+      roadmap_stage: session.roadmapStage,
+      mode: session.mode,
+      started_at: session.startedAt,
+      status: session.status,
+      opening_message: openingText
+    });
+  } catch (error) {
+    console.error("Session creation error:", error);
+    return res.status(500).json({ error: "Failed to create mentor session" });
+  }
+});
+
+// GET /api/mentor/sessions/:id
+app.get("/api/mentor/sessions/:id", (req: Request, res: Response) => {
+  const sessionId = req.params.id;
+  const session = mentorSessionsDb.get(sessionId);
+  if (!session) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  const messages = mentorMessagesDb.get(sessionId) || [];
+  return res.json({ session, messages });
+});
+
+// GET /api/mentor/sessions
+app.get("/api/mentor/sessions", (req: Request, res: Response) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  let userId = "user-demo-101";
+  if (token) {
+    try {
+      const decoded: any = jwt.decode(token);
+      if (decoded?.id) userId = decoded.id;
+    } catch (e) {}
+  }
+  const userSessions = Array.from(mentorSessionsDb.values()).filter(s => s.userId === userId);
+  return res.json({ sessions: userSessions });
+});
+
+// POST /api/mentor/sessions/:id/messages
+app.post("/api/mentor/sessions/:id/messages", async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const session = mentorSessionsDb.get(sessionId) || {
+      id: sessionId,
+      userId: "user-demo-101",
+      domain: "Math & Statistics",
+      skill: "Linear Algebra",
+      skillId: "s4",
+      topic: "Matrix Operations",
+      roadmapStage: "Mathematics & Statistics",
+      mode: "learn",
+      startedAt: new Date().toISOString(),
+      status: "active"
+    };
+
+    const userMsg: MentorDbMessage = {
+      id: `msg-${Date.now()}-u`,
+      sessionId,
+      userId: session.userId,
+      role: 'user',
+      content: message,
+      createdAt: new Date().toISOString()
+    };
+
+    const history = mentorMessagesDb.get(sessionId) || [];
+    history.push(userMsg);
+
+    const focus = serverCalculateTodaysFocus(session.userId);
+
+    const systemPrompt = `You are PathAI AI Mentor, an elite, encouraging technical tutor for a learner training to become an AI/ML Engineer.
+Learner Context:
+- Focus Skill: ${session.skill} (${focus.mastery}% mastery)
+- Subtopic: ${session.topic || 'Core Foundations'}
+- Domain: ${session.domain}
+- Current Stage: ${session.roadmapStage}
+- Mode: ${session.mode.toUpperCase()}
+Guidelines:
+1. Explain clearly with analogies, code examples, or mathematical intuition.
+2. Keep responses concise (150-250 words) with structured formatting and bold highlights.
+3. Guide the learner to master prerequisites and connect ideas to AI engineering.
+4. Mathematical Clarity: Write formulas in clean, readable notation (e.g. 12x² + 4, dL/dw, θ ← θ - α∇L) rather than raw backslash LaTeX markup like \\(...\\).`;
+
+    let replyText = await callAIBackend({
+      systemPrompt,
+      userPrompt: message,
+      history: history.map(h => ({ role: h.role, content: h.content })),
+      temperature: 0.5
+    });
+
+    if (!replyText) {
+      // Deterministic contextual response
+      const lower = message.toLowerCase();
+      if (lower.includes("weak") || lower.includes("weakest")) {
+        replyText = `Your primary gap is **${focus.skill}** at **${focus.mastery}% mastery**.\n\n${focus.blocksStage ? `⚠️ It is currently blocking your transition to **${focus.blocksStage}**.` : ''}\n\nLet's reinforce it through structured practice or take a quick assessment!`;
+      } else if (lower.includes("why") && lower.includes("important")) {
+        replyText = `**Why is ${session.skill} crucial for AI/ML?**\n\nEvery neural network operation, loss optimization, and feature pipeline relies directly on ${session.skill}. Mastering it ensures you can reason mathematically about model convergence and debug deep learning architectures with confidence.`;
+      } else {
+        replyText = `That's an insightful question about **${session.skill}**!\n\nIn machine learning systems, understanding ${session.topic || session.skill} allows you to control model variance, optimize matrix computations on GPUs, and understand gradient flow.\n\nWould you like to solve an applied coding exercise or take a 5-question assessment to test your mastery?`;
       }
     }
 
-    // Smart contextual fallback
-    const lower = message.toLowerCase();
-    let reply = "Based on your current progress and goals, you're building solid momentum! ";
-    let suggestions = [
-      { label: "View Dynamic Roadmap", actionType: "navigate", payload: "/learning-path" },
-      { label: "Assess Skill Gaps", actionType: "start-quiz", payload: "rag-systems" }
-    ];
+    const aiMsg: MentorDbMessage = {
+      id: `msg-${Date.now()}-a`,
+      sessionId,
+      userId: session.userId,
+      role: 'assistant',
+      content: replyText,
+      createdAt: new Date().toISOString()
+    };
 
-    if (lower.includes("rag") || lower.includes("vector") || lower.includes("embedding")) {
-      reply = `**Strategic Sequence for RAG Mastery:**
-1. **Embedding Models**: Understand cosine similarity, normalized dot products, and token limits.
-2. **Chunking & Metadata**: Implement semantic chunking with recursive boundary splitting.
-3. **Vector Databases**: Compare HNSW indexing vs Flat indices in Chroma/Pinecone.
-4. **Hybrid Search**: Combine BM25 keyword search with dense semantic retrieval for high-accuracy recall.
+    history.push(aiMsg);
+    mentorMessagesDb.set(sessionId, history);
 
-👉 *Next Action:* Dive into the **Vector Database Optimization** lab to build your production retrieval pipeline.`;
-    } else if (lower.includes("python") || lower.includes("start") || lower.includes("beginner")) {
-      reply = `You already have strong Python foundations! Rather than repeating beginner syntax, focus on:
-- **AsyncIO & Fast concurrency** for low-latency model calls
-- **Type hints & Pydantic models** for robust AI schemas
-- **Vectorized operations in NumPy** for custom tensor manipulation.
+    return res.json({
+      id: aiMsg.id,
+      reply: replyText,
+      suggested_actions: [`Practice ${session.skill}`, `Quiz on ${session.skill}`, "Why is this skill important?"]
+    });
+  } catch (error) {
+    console.error("Mentor message error:", error);
+    return res.status(500).json({ error: "Failed to process mentor message" });
+  }
+});
 
-You are ready to advance directly to **PyTorch Autograd & Transformer Architectures**.`;
-    } else if (lower.includes("project") || lower.includes("portfolio")) {
-      reply = `**Top 2 High-Impact Portfolio Projects for your goal:**
-1. **Multi-Agent Research Assistant**: Autonomous agents that search the web, synthesize documentation, and write technical reports.
-2. **Production RAG Engine with Evaluator**: End-to-end question answering pipeline benchmarked against standard RAG Triad metrics (Faithfulness, Answer Relevance, Context Precision).`;
-    } else {
-      reply = `You're currently past foundational concepts and entering the **Deep Learning & Applied Generative AI** stage. 
+// POST /api/mentor/sessions/:id/practice
+app.post("/api/mentor/sessions/:id/practice", async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    const session = mentorSessionsDb.get(sessionId) || {
+      userId: "user-demo-101",
+      domain: "Math & Statistics",
+      skill: "Linear Algebra",
+      topic: "Matrix Operations"
+    };
 
-Based on your profile:
-• **Strength**: Python (90%) and ML Foundations (78%)
-• **Critical Gap to Close**: Vector indexing & Hybrid Search (32% → 85%)
+    const focus = serverCalculateTodaysFocus(session.userId);
+    const difficulty = focus.mastery < 35 ? "Beginner" : focus.mastery < 65 ? "Intermediate" : "Advanced";
 
-I recommend dedicating your next 3 learning hours to **Building a Self-Healing Code Assistant** project.`;
+    const prompt = `Generate a coding/conceptual practice problem for ${focus.skill} (topic: ${focus.topic || 'Core concepts'}).
+Difficulty: ${difficulty}. Return JSON with: exercise_prompt, difficulty, hints (array), starter_code.`;
+
+    const aiJson = await callAIBackend({
+      systemPrompt: "You are a senior technical instructor generating high-yield practice exercises.",
+      userPrompt: prompt,
+      jsonMode: true
+    });
+
+    let parsed: any = null;
+    if (aiJson) {
+      try { parsed = JSON.parse(aiJson); } catch (e) {}
+    }
+
+    if (!parsed || !parsed.exercise_prompt) {
+      parsed = {
+        exercise_prompt: `**Practice Challenge: ${focus.skill} (${difficulty})**\n\nImplement an efficient function in Python demonstrating ${focus.topic || focus.skill}. Analyze the computational complexity and test with edge cases.`,
+        difficulty,
+        hints: [`Review key definitions of ${focus.skill}`, "Handle 0 and boundary conditions"],
+        starter_code: `# Starter code for ${focus.skill}\nimport numpy as np\n\ndef solve():\n    # TODO: Implement solution\n    pass\n`
+      };
     }
 
     return res.json({
-      reply,
-      suggestedActions: suggestions
+      topic: focus.topic || focus.skill,
+      skill: focus.skill,
+      exercise_prompt: parsed.exercise_prompt,
+      difficulty: parsed.difficulty || difficulty,
+      hints: parsed.hints || [],
+      starter_code: parsed.starter_code
     });
   } catch (error) {
-    console.error("Mentor chat error:", error);
-    return res.status(500).json({ error: "Failed to generate mentor response." });
+    console.error("Practice endpoint error:", error);
+    return res.status(500).json({ error: "Failed to generate practice challenge" });
   }
+});
+
+// POST /api/mentor/sessions/:id/assessment
+app.post("/api/mentor/sessions/:id/assessment", async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id;
+    const session = mentorSessionsDb.get(sessionId) || {
+      userId: "user-demo-101",
+      skill: "Linear Algebra",
+      topic: "Matrix Operations"
+    };
+
+    const focus = serverCalculateTodaysFocus(session.userId);
+    const skillName = focus.skill;
+    const bankQuestions = MENTOR_QUESTION_BANK[skillName] || MENTOR_QUESTION_BANK["Linear Algebra"];
+    const serverQuestions = bankQuestions.slice(0, 5);
+
+    const assessmentId = `asm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    mentorAssessmentsDb.set(assessmentId, {
+      id: assessmentId,
+      sessionId,
+      userId: session.userId,
+      skill: skillName,
+      topic: focus.topic,
+      serverQuestions
+    });
+
+    // Client-safe questions (NO correctAnswer, NO explanation)
+    const clientQuestions = serverQuestions.map(q => ({
+      id: q.id,
+      text: q.text,
+      options: q.options
+    }));
+
+    return res.json({
+      assessment_id: assessmentId,
+      skill: skillName,
+      topic: focus.topic,
+      total_questions: clientQuestions.length,
+      questions: clientQuestions
+    });
+  } catch (error) {
+    console.error("Assessment creation error:", error);
+    return res.status(500).json({ error: "Failed to create assessment" });
+  }
+});
+
+// POST /api/mentor/assessments/:id/submit
+app.post("/api/mentor/assessments/:id/submit", (req: Request, res: Response) => {
+  try {
+    const assessmentId = req.params.id;
+    const { answers = [] } = req.body;
+
+    let asm = mentorAssessmentsDb.get(assessmentId);
+    if (!asm) {
+      const fallbackQuestions = MENTOR_QUESTION_BANK["Linear Algebra"].slice(0, 5);
+      asm = {
+        id: assessmentId,
+        userId: "user-demo-101",
+        skill: "Linear Algebra",
+        serverQuestions: fallbackQuestions
+      };
+    }
+
+    const serverQuestions = asm.serverQuestions;
+    let correctCount = 0;
+
+    const results = serverQuestions.map((q, idx) => {
+      const userAns = answers[idx];
+      const isCorrect = userAns === q.correctAnswer;
+      if (isCorrect) correctCount++;
+      return {
+        question_id: q.id,
+        correct: isCorrect,
+        selected_option: userAns,
+        correct_option: q.correctAnswer,
+        explanation: q.explanation
+      };
+    });
+
+    const score = Math.round((correctCount / Math.max(1, serverQuestions.length)) * 100);
+
+    const focusBefore = serverCalculateTodaysFocus(asm.userId);
+    const newMastery = Math.min(100, Math.round(focusBefore.mastery * 0.4 + score * 0.6));
+
+    // Update persistent user topic progress
+    let userMap = userTopicProgressDb.get(asm.userId);
+    if (!userMap) {
+      userMap = new Map();
+      userTopicProgressDb.set(asm.userId, userMap);
+    }
+
+    userMap.set(focusBefore.skillId, {
+      mastery: newMastery,
+      attempts: (userMap.get(focusBefore.skillId)?.attempts || 0) + 1,
+      correct: correctCount,
+      lastAssessed: new Date().toISOString()
+    });
+
+    // Recalculate Today's Focus dynamically
+    const updatedFocus = serverCalculateTodaysFocus(asm.userId);
+
+    const feedback = score >= 80
+      ? `🎉 Excellent mastery! You scored ${score}% (${correctCount}/${serverQuestions.length} correct). Your proficiency in ${asm.skill} increased to ${newMastery}%.`
+      : score >= 50
+      ? `👍 Good effort! You scored ${score}% (${correctCount}/${serverQuestions.length} correct). Mastery updated to ${newMastery}%.`
+      : `📚 Keep practicing! You scored ${score}% (${correctCount}/${serverQuestions.length} correct). Foundations reinforced to ${newMastery}%.`;
+
+    return res.json({
+      assessment_id: assessmentId,
+      score,
+      correct_count: correctCount,
+      total_questions: serverQuestions.length,
+      results,
+      new_mastery: newMastery,
+      skill_name: asm.skill,
+      updated_focus: updatedFocus,
+      mentor_feedback: feedback
+    });
+  } catch (error) {
+    console.error("Assessment submit error:", error);
+    return res.status(500).json({ error: "Failed to evaluate assessment" });
+  }
+});
+
+// GET /api/mentor/skills
+app.get("/api/mentor/skills", (req: Request, res: Response) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  let userId = "user-demo-101";
+  if (token) {
+    try {
+      const decoded: any = jwt.decode(token);
+      if (decoded?.id) userId = decoded.id;
+    } catch (e) {}
+  }
+
+  const userProgress = userTopicProgressDb.get(userId);
+
+  const skills = MENTOR_CANONICAL_SKILLS.map(s => {
+    let mastery = s.progress;
+    if (userProgress && userProgress.has(s.id)) {
+      mastery = userProgress.get(s.id)!.mastery;
+    }
+    return { ...s, progress: mastery };
+  });
+
+  return res.json({ skills });
+});
+
+// Legacy backward-compatible endpoint
+app.post("/api/mentor/chat", async (req: Request, res: Response) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Message is required" });
+  const reply = await callAIBackend({
+    systemPrompt: "You are PathAI, an elite AI career mentor.",
+    userPrompt: message
+  });
+  return res.json({
+    reply: reply || "I'm your PathAI mentor. Let's work on your learning path!",
+    suggestedActions: [
+      { label: "View Recommended Labs", actionType: "navigate", payload: "/learning-path" },
+      { label: "Take Skill Assessment", actionType: "start-quiz", payload: "linear-algebra" }
+    ]
+  });
 });
 
 // ================= NLP-POWERED REGISTRATION & PROFILE ENDPOINTS =================
