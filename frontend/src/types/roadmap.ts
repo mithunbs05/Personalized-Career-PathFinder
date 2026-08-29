@@ -179,7 +179,14 @@ export interface LearningRoadmap {
 }
 
 // Skill Matrix Specific Types
-export type SkillLevel = 'Advanced' | 'Intermediate' | 'Developing' | 'Novice' | 'Locked';
+export type SkillLevel = 'Advanced' | 'Proficient' | 'Intermediate' | 'Developing' | 'Novice' | 'Locked';
+
+export interface RadarMetric {
+  subject: string;
+  currentLevel: number;
+  industryBenchmark: number;
+  fullMark: number;
+}
 
 export interface SkillVerificationDetails {
   courseName?: string;
