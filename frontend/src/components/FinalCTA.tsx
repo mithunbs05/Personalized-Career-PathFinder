@@ -34,7 +34,7 @@ export const FinalCTA: React.FC = () => {
           
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.1] tracking-tight mb-8 text-[#1A1A1A] dark:text-white">
             Your goal is unique.{' '}
-            <span className="font-editorial italic text-[#4A4A4A] dark:text-[#A0A09B] block mt-2">
+            <span className="font-editorial italic text-stone-400 dark:text-stone-400 font-normal block mt-2">
               Your learning path should be too.
             </span>
           </h2>

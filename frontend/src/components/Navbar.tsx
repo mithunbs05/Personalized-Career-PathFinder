@@ -72,12 +72,6 @@ export const Navbar: React.FC = () => {
           >
             Features
           </a>
-          <a
-            href="#personalization"
-            className="hover:text-[#1A1A1A] dark:hover:text-white transition-colors"
-          >
-            Personalization Demo
-          </a>
         </nav>
 
         {/* Right: Auth & Theme Toggle */}
@@ -163,13 +157,6 @@ export const Navbar: React.FC = () => {
                 className="py-1 hover:text-[#FF4D31]"
               >
                 Features
-              </a>
-              <a
-                href="#personalization"
-                onClick={() => setMobileOpen(false)}
-                className="py-1 hover:text-[#FF4D31]"
-              >
-                Personalization Demo
               </a>
               <div className="pt-4 border-t border-[#E8E6DE] dark:border-[#2C2C29] flex flex-col gap-3">
                 {user ? (
