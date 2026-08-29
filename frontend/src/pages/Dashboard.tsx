@@ -5,6 +5,7 @@ import { RoadmapStage } from '../types/roadmap';
 import { RoadmapCanvas } from '../components/roadmap/RoadmapCanvas';
 import { CourseMaterialsDrawer } from '../components/roadmap/CourseMaterialsDrawer';
 import SkillMatrix from '../components/roadmap/SkillMatrix';
+import { AIMentorPage } from '../components/mentor/AIMentorPage';
 
 // Mock Data Structured for API Integration
 const MOCK_STAGES: RoadmapStage[] = [
@@ -332,11 +333,13 @@ export const Dashboard: React.FC = () => {
           </div>
         ) : activeTab === 'skills' ? (
           <SkillMatrix />
+        ) : activeTab === 'mentor' ? (
+          <AIMentorPage stages={stages} user={user} onNavigate={setActiveTab} />
         ) : (
           <div className="flex items-center justify-center h-[500px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm">
             <div className="text-center">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                {activeTab === 'mentor' ? 'AI Mentor Full View' : 'Active Labs'}
+                Active Labs
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">This feature is currently under construction.</p>
             </div>
