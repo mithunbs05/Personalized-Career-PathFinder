@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -648,6 +649,17 @@ def grade_assessment(
 # 5. Database Persistence Helpers (Supabase)
 # ---------------------------------------------------------------------------
 
+def _ensure_valid_uuid(val: Optional[str]) -> Optional[str]:
+    """Ensures input string is a valid UUID, deterministically converting string IDs if necessary."""
+    if not val:
+        return None
+    try:
+        uuid.UUID(str(val))
+        return str(val)
+    except (ValueError, TypeError, AttributeError):
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(val)))
+
+
 async def save_session_to_db(
     user_id: str,
     domain: str,
@@ -657,10 +669,13 @@ async def save_session_to_db(
     mode: str,
 ) -> str:
     """Creates a new mentor session in Supabase and returns its UUID."""
+    valid_uid = _ensure_valid_uuid(user_id)
+    fallback_id = str(uuid.uuid4())
     try:
         client = get_supabase_client()
         row = {
-            "user_id": user_id,
+            "id": fallback_id,
+            "user_id": valid_uid,
             "domain": domain,
             "skill": skill,
             "topic": topic,
@@ -673,7 +688,7 @@ async def save_session_to_db(
             return res.data[0]["id"]
     except Exception as e:
         logger.error("Failed to persist mentor session to Supabase: %s", e)
-    return f"sess-{int(datetime.now(timezone.utc).timestamp())}"
+    return fallback_id
 
 
 async def save_message_to_db(
@@ -684,11 +699,15 @@ async def save_message_to_db(
     metadata: Optional[dict[str, Any]] = None,
 ) -> str:
     """Persists a message to Supabase."""
+    valid_sid = _ensure_valid_uuid(session_id)
+    valid_uid = _ensure_valid_uuid(user_id)
+    fallback_id = str(uuid.uuid4())
     try:
         client = get_supabase_client()
         row = {
-            "session_id": session_id,
-            "user_id": user_id,
+            "id": fallback_id,
+            "session_id": valid_sid,
+            "user_id": valid_uid,
             "role": role,
             "content": content,
             "metadata": metadata or {},
@@ -698,7 +717,7 @@ async def save_message_to_db(
             return res.data[0]["id"]
     except Exception as e:
         logger.error("Failed to persist mentor message: %s", e)
-    return f"msg-{int(datetime.now(timezone.utc).timestamp())}"
+    return fallback_id
 
 
 async def save_assessment_to_db(
@@ -712,12 +731,15 @@ async def save_assessment_to_db(
     results: list[QuestionResult],
 ) -> str:
     """Persists assessment record and individual answers to Supabase."""
-    assessment_id = f"asm-{int(datetime.now(timezone.utc).timestamp())}"
+    valid_sid = _ensure_valid_uuid(session_id) if session_id else None
+    valid_uid = _ensure_valid_uuid(user_id)
+    assessment_id = str(uuid.uuid4())
     try:
         client = get_supabase_client()
         row = {
-            "session_id": session_id,
-            "user_id": user_id,
+            "id": assessment_id,
+            "session_id": valid_sid,
+            "user_id": valid_uid,
             "skill": skill,
             "topic": topic,
             "score": score,
@@ -731,6 +753,7 @@ async def save_assessment_to_db(
         # Insert answers
         answer_rows = [
             {
+                "id": str(uuid.uuid4()),
                 "assessment_id": assessment_id,
                 "question_id": r.question_id,
                 "answer": str(r.selected_option),
@@ -757,10 +780,11 @@ async def update_topic_progress_in_db(
     correct_count: int,
 ) -> None:
     """Upserts learner's topic mastery in Supabase."""
+    valid_uid = _ensure_valid_uuid(user_id)
     try:
         client = get_supabase_client()
         row = {
-            "user_id": user_id,
+            "user_id": valid_uid,
             "skill_id": skill_id,
             "skill_name": skill_name,
             "domain": domain,
@@ -778,10 +802,86 @@ async def update_topic_progress_in_db(
 
 async def get_user_topic_progress_from_db(user_id: str) -> list[dict[str, Any]]:
     """Loads all tracked topic masteries for a user from Supabase."""
+    valid_uid = _ensure_valid_uuid(user_id)
     try:
         client = get_supabase_client()
-        res = client.table("mentor_topic_progress").select("*").eq("user_id", user_id).execute()
+        res = client.table("mentor_topic_progress").select("*").eq("user_id", valid_uid).execute()
         return res.data or []
     except Exception as e:
         logger.error("Failed to load user topic progress: %s", e)
         return []
+
+
+async def get_active_session_from_db(user_id: str) -> Optional[dict[str, Any]]:
+    """Loads the most recent active mentor session for a user from Supabase."""
+    valid_uid = _ensure_valid_uuid(user_id)
+    try:
+        client = get_supabase_client()
+        res = (
+            client.table("mentor_sessions")
+            .select("*")
+            .eq("user_id", valid_uid)
+            .eq("status", "active")
+            .order("started_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if res.data and len(res.data) > 0:
+            return res.data[0]
+    except Exception as e:
+        logger.error("Failed to load active session: %s", e)
+    return None
+
+
+async def get_session_messages_from_db(session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Loads message history for a given mentor session."""
+    valid_sid = _ensure_valid_uuid(session_id)
+    try:
+        client = get_supabase_client()
+        res = (
+            client.table("mentor_messages")
+            .select("*")
+            .eq("session_id", valid_sid)
+            .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        logger.error("Failed to load session messages: %s", e)
+    return []
+
+
+async def get_recent_assessments_from_db(user_id: str, limit: int = 5) -> list[dict[str, Any]]:
+    """Loads recent assessment records for a user."""
+    valid_uid = _ensure_valid_uuid(user_id)
+    try:
+        client = get_supabase_client()
+        res = (
+            client.table("mentor_assessments")
+            .select("*")
+            .eq("user_id", valid_uid)
+            .order("completed_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        logger.error("Failed to load recent assessments: %s", e)
+    return []
+
+
+async def get_user_profile_from_db(user_id: str) -> Optional[dict[str, Any]]:
+    """Loads user profile record containing target_role and onboarding metadata."""
+    valid_uid = _ensure_valid_uuid(user_id)
+    try:
+        client = get_supabase_client()
+        res = client.table("profiles").select("*").eq("user_id", valid_uid).limit(1).execute()
+        if res.data and len(res.data) > 0:
+            return res.data[0]
+    except Exception as e:
+        logger.error("Failed to load user profile: %s", e)
+    return None
+
+
+

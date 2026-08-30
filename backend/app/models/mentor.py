@@ -44,6 +44,15 @@ class LearnerContextResponse(BaseModel):
     relevant_skills: list[RelevantSkillItem] = Field(default_factory=list)
     recent_assessments: list[dict[str, Any]] = Field(default_factory=list)
     active_session_id: Optional[str] = None
+    active_session: Optional[dict[str, Any]] = None
+    recent_messages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SessionDetailsResponse(BaseModel):
+    """Details of a mentor session and its conversation messages."""
+    session: MentorSessionResponse
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+
 
 
 class MentorSessionCreateRequest(BaseModel):

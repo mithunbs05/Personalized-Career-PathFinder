@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Compass, CheckCircle2, ArrowRight, Brain, Zap, Clock, Code2, Layers, ShieldCheck, Lock, Unlock } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Brain, Zap, Clock, Code2, Layers, ShieldCheck, Lock, Unlock } from 'lucide-react';
 import { TiltCard } from './ui/TiltCard';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -110,15 +110,6 @@ export const Hero: React.FC = () => {
               <span>Build My Learning Path</span>
               <span className="transition-transform group-hover:translate-x-1">&rarr;</span>
             </Link>
-
-            <a
-              id="hero-cta-explore"
-              href="#how-it-works"
-              className="px-8 py-4 rounded-full font-semibold border border-[#E8E6DE] dark:border-[#2C2C29] bg-white/80 dark:bg-[#1A1A18]/80 hover:bg-white dark:hover:bg-[#252522] backdrop-blur-sm text-[#1A1A1A] dark:text-white transition-colors inline-flex items-center gap-2 text-base shadow-sm"
-            >
-              <Compass className="w-4 h-4 text-[#7A8B7C]" />
-              <span>Explore 3D Demo</span>
-            </a>
           </div>
 
           {/* Animated Stats Counter Bar */}

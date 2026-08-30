@@ -10,7 +10,7 @@ import {
   MentorMode,
   AssessmentQuestion,
 } from '../types/mentor';
-import { TestUserProfile } from '../data/mentorData';
+
 
 // ---------------------------------------------------------------------------
 // 1. Live Backend API Methods
@@ -24,7 +24,7 @@ export interface LearnerContextPayload {
   current_stage_order: number;
   current_stage_progress: number;
   overall_mastery: number;
-  focus: TodaysFocus;
+  focus: TodaysFocus | null;
   relevant_skills: Array<{
     id: string;
     name: string;
@@ -34,6 +34,29 @@ export interface LearnerContextPayload {
     is_verified?: boolean;
   }>;
   recent_assessments: any[];
+  active_session_id?: string | null;
+  active_session?: SessionResponsePayload | null;
+  recent_messages?: Array<{
+    id: string;
+    sender: 'user' | 'ai';
+    text: string;
+    timestamp: string;
+  }>;
+}
+
+export function normalizeTodaysFocus(raw: any): TodaysFocus | null {
+  if (!raw) return null;
+  return {
+    domain: raw.domain || 'Core Skills',
+    skill: raw.skill || 'Foundational Skill',
+    skillId: raw.skillId || raw.skill_id || 's1',
+    topic: raw.topic || null,
+    priority: (raw.priority || 'MEDIUM') as 'HIGH' | 'MEDIUM' | 'LOW',
+    mastery: typeof raw.mastery === 'number' ? raw.mastery : 50,
+    estimatedMinutes: raw.estimatedMinutes || raw.estimated_minutes || 45,
+    reason: raw.reason || 'Recommended focus area based on your curriculum roadmap',
+    blocksStage: raw.blocksStage || raw.blocks_stage || null,
+  };
 }
 
 export interface SessionResponsePayload {
@@ -93,23 +116,33 @@ export interface SubmitAssessmentPayload {
   }>;
   new_mastery: number;
   skill_name: string;
-  updated_focus?: TodaysFocus;
+  updated_focus?: TodaysFocus | null;
   mentor_feedback: string;
 }
 
 export const mentorService = {
   /**
-   * Fetches real-time learner context, active stage, and today's focus.
+   * Fetches real-time learner context, active stage, and today's focus from backend.
    */
   async getContext(): Promise<LearnerContextPayload> {
-    return request<LearnerContextPayload>('/mentor/context');
+    const raw = await request<any>('/mentor/context');
+    return {
+      ...raw,
+      focus: normalizeTodaysFocus(raw.focus),
+      relevant_skills: raw.relevant_skills || [],
+      recent_assessments: raw.recent_assessments || [],
+      active_session_id: raw.active_session_id || null,
+      active_session: raw.active_session || null,
+      recent_messages: raw.recent_messages || [],
+    };
   },
 
   /**
    * Calculates dynamic Today's Focus on the server.
    */
   async getTodaysFocus(): Promise<TodaysFocus> {
-    return request<TodaysFocus>('/mentor/focus');
+    const raw = await request<any>('/mentor/focus');
+    return normalizeTodaysFocus(raw)!;
   },
 
   /**
@@ -127,7 +160,7 @@ export const mentorService = {
         skill: focus?.skill,
         skill_id: focus?.skillId,
         topic: focus?.topic,
-        roadmapStage: focus?.blocksStage || 'Mathematics & Statistics',
+        roadmap_stage: focus?.blocksStage || 'Mathematics & Statistics',
       }),
     });
   },
@@ -174,10 +207,14 @@ export const mentorService = {
     assessmentId: string,
     answers: number[]
   ): Promise<SubmitAssessmentPayload> {
-    return request<SubmitAssessmentPayload>(`/mentor/assessments/${assessmentId}/submit`, {
+    const raw = await request<any>(`/mentor/assessments/${assessmentId}/submit`, {
       method: 'POST',
       body: JSON.stringify({ answers }),
     });
+    return {
+      ...raw,
+      updated_focus: normalizeTodaysFocus(raw.updated_focus),
+    };
   },
 
   /**
@@ -187,6 +224,7 @@ export const mentorService = {
     return request<{ skills: any[] }>('/mentor/skills');
   },
 };
+
 
 // ---------------------------------------------------------------------------
 // 2. Client-Side Priority Algorithm (Local Evaluation & Offline Fallback)
@@ -204,30 +242,18 @@ export function calculateTodaysFocus(
   stages: RoadmapStage[],
   skillClusters: SkillCluster[],
   _user: User | null,
-  testProfile?: TestUserProfile | null,
   skillOverrides?: Record<string, number>
 ): TodaysFocus | null {
-  // Build effective stages (apply test profile overrides if present)
-  const effectiveStages = testProfile
-    ? stages.map(s => ({
-        ...s,
-        status: testProfile.stageOverrides[s.id] || s.status,
-      }))
-    : stages;
-
   // Build effective skill lookup with overrides
   const getEffectiveProgress = (skill: SkillItem): number => {
     if (skillOverrides && skillOverrides[skill.id] !== undefined) {
       return skillOverrides[skill.id];
     }
-    if (testProfile && testProfile.skillOverrides[skill.id] !== undefined) {
-      return testProfile.skillOverrides[skill.id];
-    }
     return skill.progress;
   };
 
-  const currentStage = effectiveStages.find(s => s.status === 'IN_PROGRESS');
-  const nextStage = effectiveStages.find(s => s.status === 'NOT_STARTED');
+  const currentStage = stages.find(s => s.status === 'IN_PROGRESS');
+  const nextStage = stages.find(s => s.status === 'NOT_STARTED');
 
   if (!currentStage && !nextStage) {
     return null;
@@ -255,7 +281,7 @@ export function calculateTodaysFocus(
       const effectiveProgress = getEffectiveProgress(skill);
 
       if (effectiveProgress >= 90) continue;
-      if (skill.level === 'Locked' && !testProfile?.skillOverrides[skill.id]) continue;
+      if (skill.level === 'Locked') continue;
 
       let score = 0;
       const reasons: string[] = [];
@@ -302,7 +328,7 @@ export function calculateTodaysFocus(
   }
 
   if (nextStage) {
-    const stageAfterNext = effectiveStages.find(
+    const stageAfterNext = stages.find(
       s => s.status === 'LOCKED' && s.prerequisites.includes(nextStage.title)
     );
     scoreSkillsForStage(nextStage, false, stageAfterNext || null);
