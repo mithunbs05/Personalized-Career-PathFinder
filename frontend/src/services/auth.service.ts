@@ -242,6 +242,34 @@ export const authService = {
         finalProfileRow?.onboarding_completed || onboardingProfileRow?.onboarding_completed
       );
 
+      let parsedProfile: UserProfile | undefined = undefined;
+      if (onboardingProfileRow?.profile_metadata) {
+        const meta = onboardingProfileRow.profile_metadata as Record<string, any>;
+        parsedProfile = {
+          targetGoal: meta.target_goal || meta.targetGoal || meta.career_goal || meta.job_specialization || 'Data Scientist',
+          experienceLevel: meta.experience_level || meta.experienceLevel || 'intermediate',
+          knownSkills: meta.known_skills || meta.knownSkills || [],
+          weeklyHours: Number(meta.weekly_hours || meta.weeklyHours || 10),
+          educationDegree: meta.education_degree || meta.educationDegree,
+          educationMajor: meta.education_major || meta.educationMajor,
+          graduationYear: meta.graduation_year || meta.graduationYear,
+          githubUrl: meta.github_url || meta.githubUrl,
+          linkedinUrl: meta.linkedin_url || meta.linkedinUrl,
+          industryExperienceType: meta.industry_experience_type || meta.industryExperienceType,
+          yearsExperience: meta.years_experience || meta.yearsExperience,
+          currentProjects: meta.current_projects || meta.currentProjects,
+          completedLearning: meta.completed_learning || meta.completedLearning,
+          technicalInterests: meta.technical_interests || meta.technicalInterests,
+          jobSpecialization: meta.job_specialization || meta.jobSpecialization,
+          targetCompletionMonths: meta.target_completion_months || meta.targetCompletionMonths,
+          salaryPlacementGoal: meta.salary_placement_goal || meta.salaryPlacementGoal,
+          learningPreferences: meta.learning_preferences || meta.learningPreferences,
+          resourceBudget: meta.resource_budget || meta.resourceBudget,
+          immediateMotivation: meta.immediate_motivation || meta.immediateMotivation,
+          languagePreference: meta.language_preference || meta.languagePreference,
+        };
+      }
+
       const user: User = {
         id: userId,
         name: finalProfileRow?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Learner',
@@ -250,7 +278,7 @@ export const authService = {
         avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(authUser.email || userId)}`,
         createdAt: finalProfileRow?.created_at || authUser.created_at,
         onboardingCompleted: isCompleted,
-        profile: (onboardingProfileRow?.profile_metadata as UserProfile) || undefined,
+        profile: parsedProfile,
       };
 
       localStorage.setItem('pathai_user', JSON.stringify(user));

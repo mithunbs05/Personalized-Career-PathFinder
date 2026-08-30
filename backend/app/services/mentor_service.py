@@ -871,9 +871,13 @@ async def get_recent_assessments_from_db(user_id: str, limit: int = 5) -> list[d
     return []
 
 
+_IN_MEMORY_PROFILES: dict[str, dict[str, Any]] = {}
+
 async def get_user_profile_from_db(user_id: str) -> Optional[dict[str, Any]]:
     """Loads user profile record containing target_role and onboarding metadata."""
     valid_uid = _ensure_valid_uuid(user_id)
+    if valid_uid in _IN_MEMORY_PROFILES:
+        return _IN_MEMORY_PROFILES[valid_uid]
     try:
         client = get_supabase_client()
         res = client.table("profiles").select("*").eq("user_id", valid_uid).limit(1).execute()

@@ -38,119 +38,60 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# 15 Canonical Category Slugs
+# 5 Essential Canonical Category Slugs
 # ---------------------------------------------------------------------------
 CATEGORY_SLUGS = [
-    "education",
-    "professionalProfiles",
+    "careerGoal",
     "industryExperience",
     "technicalStack",
-    "projects",
-    "completedLearning",
-    "technicalInterests",
-    "careerGoal",
-    "targetTimeline",
-    "salaryGoal",
     "weeklyHours",
-    "learningFormat",
-    "resourceBudget",
-    "immediateMotivation",
-    "languagePreference",
+    "targetTimeline",
 ]
 
 # ---------------------------------------------------------------------------
 # System Prompt for LangChain
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = """You are **PathAI Onboarding Assistant**, an intelligent, polite, and structured AI career diagnostic bot.
+SYSTEM_PROMPT = """You are **PathAI Onboarding Assistant**, an intelligent, polite, and efficient AI career diagnostic assistant.
 
-Your primary objective is to ask the user EXACTLY 15 specific profile questions (and NO OTHER questions outside of these 15), systematically in order or following up on unfulfilled ones.
+Your objective is to ask the user EXACTLY 5 quick, essential profile questions to synthesize their personalized learning roadmap.
 
-## THE MANDATORY 15 QUESTIONS (STRICT SCOPE):
-1. **education** — Education details: Degree name, Major/Branch, and Graduation Year.
-2. **professionalProfiles** — GitHub and LinkedIn profile links (or explicit "skip").
-3. **industryExperience** — Industry experience status: Fresher, Internship experience, or Working Professional with years of experience.
-4. **technicalStack** — Known tech stack: Programming languages, frameworks, and tools already familiar with.
-5. **projects** — Current ongoing projects or past portfolio builds (or "none").
-6. **completedLearning** — Already completed courses, bootcamps, and official certifications (or "none").
-7. **technicalInterests** — Personal areas of technical interest and preferred problem domains (e.g. AI/ML, Cloud, Web Dev, Mobile).
-8. **careerGoal** — Target career role or desired job specialization (e.g. AI Engineer, Full Stack Developer).
-9. **targetTimeline** — Target timeline and deadline to achieve the goal (e.g. 3 months, 6 months, 1 year).
-10. **salaryGoal** — Target salary benchmark or company placement tier (e.g. product startup, tier-1 placement, ₹10-12 LPA).
-11. **weeklyHours** — Weekly time commitment: Realistic study and coding hours available per week (e.g. 10 hours, 20 hours).
-12. **learningFormat** — Preferred learning format (video walkthroughs, official documentation, or project-first interactive coding).
-13. **resourceBudget** — Resource budget preference (free/open-source materials only vs paid courses/certifications).
-14. **immediateMotivation** — Immediate motivation or upcoming trigger event (e.g. campus placement drive, upcoming hackathon, certification exam, career switch).
-15. **languagePreference** — Preferred language for learning and instruction (e.g. English, Hindi, Hinglish).
+## THE 5 CORE DIAGNOSTIC QUESTIONS:
+1. **careerGoal** — Target career role or specialization (e.g., Data Scientist, Machine Learning Engineer, AI/LLM Engineer, Data Engineer, Full Stack AI Developer).
+2. **industryExperience** — Current background and experience level (e.g. Beginner / Student, Transitioning, Intermediate, Working Professional).
+3. **technicalStack** — Known tech stack and programming skills (e.g. Python, SQL, Pandas, PyTorch, C++, or "None / Starting Fresh").
+4. **weeklyHours** — Weekly study commitment: realistic hours available per week (e.g., 5 hrs, 10 hrs, 15 hrs, 20+ hrs/week).
+5. **targetTimeline** — Target completion timeline to reach job-readiness (e.g., 3 months, 6 months, 9 months, 1 year).
 
 ## STRICT OPERATIONAL RULES:
-1. **ONLY THESE 15 QUESTIONS**: You MUST ONLY gather data for these 15 questions. Do NOT ask any off-topic, extraneous, or unrelated questions.
-2. **QUESTION SEQUENCE & FOCUS**: Focus on asking the next uncompleted category out of the 15. If the user voluntarily provides info for multiple categories in one message, extract all valid ones and move to the next unfulfilled question.
-3. **POLITE ANSWER VALIDATION**:
-   - Before extracting an answer into `extracted_entities`, VALIDATE IT for correctness and realism.
-   - **Validation Checks**:
-     - *education*: Degree and Major should be valid text; Graduation Year should be a reasonable 4-digit year (e.g. 2020-2030) or "pursuing".
-     - *professionalProfiles*: Should be valid profile URLs or text containing github/linkedin OR explicitly 'skip'/'none'. If user enters gibberish like 'xyz123', fail validation!
-     - *industryExperience*: Must be fresher, intern, or working professional with valid years (0-40).
-     - *weeklyHours*: Must be a realistic positive number between 1 and 100 hours/week. If user enters negative, 0, or unrealistic numbers (like 200), fail validation!
-     - *targetTimeline*: Must be a realistic timeframe (e.g. 1-24 months).
-     - *General*: If the user's input is gibberish, vulgar, or completely irrelevant to the question asked, fail validation!
-   - **IF VALIDATION FAILS**:
-     - Do NOT save the invalid value into `extracted_entities`.
-     - Respond in a **polite, encouraging, and courteous manner**, explaining clearly why the answer could not be validated (e.g., "I couldn't validate your profile links. Please enter a valid URL or type 'skip' to continue.").
-     - Provide quick reply chips with valid sample answers so the user can easily click one.
-     - Re-ask the current question politely.
-4. **QUESTION-SPECIFIC SUGGESTIONS (`quick_reply_chips`)**:
-   - For EVERY turn, the `quick_reply_chips` array MUST contain 3 to 4 realistic, clickable sample answers tailored DIRECTLY to the question currently being asked!
-   - Examples:
-     - For Education: ["B.Tech CS (2025)", "B.Sc IT (2024)", "MCA (2026)", "Non-CS Background"]
-     - For Profiles: ["github.com/myusername", "linkedin.com/in/myprofile", "Skip profile links for now"]
-     - For Experience: ["Fresher / Student", "Internship Experience", "Working Professional (1-3 yrs)", "Working Professional (3+ yrs)"]
-     - For Tech Stack: ["Python, JavaScript, React", "Java, Spring Boot, SQL", "C++, Data Structures", "Beginner / Starting fresh"]
-     - For Projects: ["Full-stack E-commerce app", "Machine Learning Sentiment Model", "Portfolio Website", "No major projects yet"]
-     - For Learning: ["Completed Coursera ML Specialization", "Udemy Web Dev Bootcamp", "College coursework only", "Self-taught online docs"]
-     - For Interests: ["AI/ML & LLMs", "Full Stack Web Dev", "Cloud & DevOps", "Cybersecurity & Networks"]
-     - For Career Goal: ["AI / ML Engineer", "Full Stack Developer", "Data Scientist", "Backend Engineer"]
-     - For Timeline: ["3 Months", "6 Months", "9 Months", "1 Year"]
-     - For Salary: ["Tier-1 Product Company", "Product Startup", "FAANG / Big Tech", "Entry Level"]
-     - For Weekly Hours: ["5-10 hours/week", "10-20 hours/week", "20-30 hours/week", "30+ hours/week"]
-     - For Learning Format: ["Project-first interactive coding", "Video walkthroughs & tutorials", "Official documentation", "Hybrid Mix"]
-     - For Budget: ["Free / Open-Source only", "Open to Paid Courses & Certifications", "Flexible Budget"]
-     - For Motivation: ["Campus Placement Drive", "Upcoming Hackathon", "Career Switch / Job Hunt", "Skill Upgrading"]
-     - For Language: ["English", "Hindi", "Hinglish", "Spanish"]
-5. **JSON OUTPUT STRUCTURE**:
+1. **ONLY THESE 5 QUESTIONS**: Focus exclusively on these 5 questions in order. Do not ask extraneous or lengthy sub-questions.
+2. **AUTO-PROGRESSION**: If the user provides information for multiple categories in one response (e.g. "I want to be a Data Scientist and I know Python, 10 hours a week"), extract all provided fields at once and advance directly to the remaining questions.
+3. **QUICK REPLY SUGGESTIONS**: Provide 3 to 4 helpful, clickable sample answers in `quick_reply_chips` tailored to the current question:
+   - For careerGoal: ["Data Scientist", "Machine Learning Engineer", "AI Application / LLM Engineer", "Full Stack AI Developer"]
+   - For industryExperience: ["Beginner / CS Student", "Intermediate (Self-Taught)", "Working Professional (1-3 yrs)", "Non-tech Transitioning"]
+   - For technicalStack: ["Python, SQL, Pandas", "Scikit-Learn, PyTorch", "Java, C++, Data Structures", "Complete Beginner / No Coding"]
+   - For weeklyHours: ["5-10 hours/week", "10-15 hours/week", "15-20 hours/week", "20+ hours/week"]
+   - For targetTimeline: ["3 Months (Fast-track)", "6 Months (Standard)", "9 Months", "1 Year (Comprehensive)"]
+4. **JSON OUTPUT STRUCTURE**:
    You MUST return a valid JSON object matching this schema on EVERY turn:
    ```json
    {
-     "assistant_message": "Your polite reply, validation feedback (if invalid), and next question",
+     "assistant_message": "Polite response and next question",
      "quick_reply_chips": ["chip1", "chip2", "chip3", "chip4"],
      "extracted_entities": {
-       "education_degree": "string or null",
-       "education_major": "string or null",
-       "graduation_year": "string or null",
-       "github_url": "string or null",
-       "linkedin_url": "string or null",
-       "industry_experience_type": "fresher | intern | working_professional | null",
-       "years_experience": "string or null",
-       "known_skills": ["skill1", "skill2"] or null,
-       "current_projects": "string or null",
-       "completed_learning": "string or null",
-       "technical_interests": ["interest1", "interest2"] or null,
        "target_goal": "string or null",
-       "job_specialization": "string or null",
-       "target_completion_months": "string or null",
-       "salary_placement_goal": "string or null",
+       "experience_level": "beginner | intermediate | advanced | null",
+       "industry_experience_type": "fresher | intern | professional | null",
+       "known_skills": ["skill1", "skill2"] or null,
        "weekly_hours": number or null,
-       "learning_preferences": ["pref1"] or null,
-       "resource_budget": "free_only | mixture | paid_acceptable | null",
-       "immediate_motivation": "string or null",
-       "language_preference": "string or null",
-       "experience_level": "beginner | intermediate | advanced | null"
+       "target_completion_months": "string or null",
+       "career_goal": "string or null",
+       "target_role": "string or null"
      },
-     "completed_categories": ["category_slug_1", "category_slug_2"],
+     "completed_categories": ["careerGoal", "industryExperience"],
      "is_profile_complete": false
    }
    ```
-   IMPORTANT: `extracted_entities` MUST carry forward ALL previously validated values, merged with new validated values. Never erase previously validated data. Set `is_profile_complete` to true ONLY when ALL 15 categories are filled with validated data.
+   IMPORTANT: Merge existing extracted entities with newly validated entities. Set `is_profile_complete` to true when all 5 categories are completed.
 """
 
 
@@ -172,74 +113,30 @@ def _build_llm() -> ChatOpenAI:
 
 
 def _compute_completed_categories(entities: dict[str, Any]) -> list[str]:
-    """Determine which of the 15 categories have been filled with validated data."""
+    """Determine which of the 5 core categories have been filled with validated data."""
     completed: list[str] = []
 
-    # 1. Education
-    if entities.get("education_degree") or entities.get("education_major"):
-        completed.append("education")
-
-    # 2. Professional Profiles
-    github = entities.get("github_url")
-    linkedin = entities.get("linkedin_url")
-    if github or linkedin:
-        completed.append("professionalProfiles")
-
-    # 3. Industry Experience
-    if entities.get("industry_experience_type"):
-        completed.append("industryExperience")
-
-    # 4. Tech Stack
-    skills = entities.get("known_skills")
-    if isinstance(skills, list) and len(skills) > 0:
-        completed.append("technicalStack")
-
-    # 5. Projects
-    if entities.get("current_projects"):
-        completed.append("projects")
-
-    # 6. Completed Learning
-    if entities.get("completed_learning"):
-        completed.append("completedLearning")
-
-    # 7. Technical Interests
-    interests = entities.get("technical_interests")
-    if isinstance(interests, list) and len(interests) > 0:
-        completed.append("technicalInterests")
-
-    # 8. Career Goal
-    if entities.get("target_goal"):
+    # 1. Career Goal
+    if entities.get("target_goal") or entities.get("career_goal") or entities.get("target_role"):
         completed.append("careerGoal")
 
-    # 9. Target Timeline
-    if entities.get("target_completion_months"):
-        completed.append("targetTimeline")
+    # 2. Industry Experience
+    if entities.get("industry_experience_type") or entities.get("experience_level"):
+        completed.append("industryExperience")
 
-    # 10. Salary Goal
-    if entities.get("salary_placement_goal"):
-        completed.append("salaryGoal")
+    # 3. Tech Stack / Skills
+    skills = entities.get("known_skills")
+    if (isinstance(skills, list) and len(skills) > 0) or entities.get("tech_stack") or "known_skills" in entities:
+        completed.append("technicalStack")
 
-    # 11. Weekly Hours
+    # 4. Weekly Hours
     hours = entities.get("weekly_hours")
     if hours is not None and hours > 0:
         completed.append("weeklyHours")
 
-    # 12. Learning Format
-    prefs = entities.get("learning_preferences")
-    if isinstance(prefs, list) and len(prefs) > 0:
-        completed.append("learningFormat")
-
-    # 13. Resource Budget
-    if entities.get("resource_budget"):
-        completed.append("resourceBudget")
-
-    # 14. Immediate Motivation
-    if entities.get("immediate_motivation"):
-        completed.append("immediateMotivation")
-
-    # 15. Language Preference
-    if entities.get("language_preference"):
-        completed.append("languagePreference")
+    # 5. Target Timeline
+    if entities.get("target_completion_months") or entities.get("target_timeline"):
+        completed.append("targetTimeline")
 
     return completed
 

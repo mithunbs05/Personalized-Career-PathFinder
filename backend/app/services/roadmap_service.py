@@ -595,6 +595,153 @@ CANONICAL_ROADMAP_STAGES: list[dict[str, Any]] = [
 
 _IN_MEMORY_STAGE_PROGRESS: dict[str, dict[int, dict[str, Any]]] = {}
 
+# Cache for pipeline-generated roadmaps, keyed by user_id
+_PIPELINE_STAGE_CACHE: dict[str, Any] = {}
+
+# Track which users have already been seeded from onboarding
+_SEEDED_USERS: set[str] = set()
+
+# ---------------------------------------------------------------------------
+# Keyword → Topic ID Matching for Onboarding Skill Seeding
+# ---------------------------------------------------------------------------
+_SKILL_KEYWORD_MAP: dict[str, list[str]] = {
+    # Python-related
+    "python": ["top-py-syntax", "top-py-funcs", "top-py-oop"],
+    "python basics": ["top-py-syntax", "top-py-funcs"],
+    "programming": ["top-py-syntax", "top-py-funcs"],
+    "oop": ["top-py-oop"],
+    "object oriented": ["top-py-oop"],
+    "data structures": ["top-dsa-basic"],
+    "algorithms": ["top-dsa-basic"],
+    "dsa": ["top-dsa-basic"],
+    # Math
+    "linear algebra": ["top-math-la-matrices"],
+    "matrices": ["top-math-la-matrices"],
+    "calculus": ["top-math-calc-grad"],
+    "probability": ["top-math-prob-bayes"],
+    "statistics": ["top-math-prob-bayes"],
+    "optimization": ["top-math-optim"],
+    "math": ["top-math-la-matrices", "top-math-calc-grad", "top-math-prob-bayes"],
+    # Data
+    "pandas": ["top-data-pandas"],
+    "numpy": ["top-data-pandas"],
+    "data analysis": ["top-data-pandas", "top-data-feat-eng"],
+    "data wrangling": ["top-data-pandas"],
+    "feature engineering": ["top-data-feat-eng"],
+    "eda": ["top-data-pandas"],
+    "data cleaning": ["top-data-pandas"],
+    "data visualization": ["top-data-pandas"],
+    # ML
+    "machine learning": ["top-ml-super-reg", "top-ml-trees"],
+    "regression": ["top-ml-super-reg"],
+    "logistic regression": ["top-ml-super-reg"],
+    "random forest": ["top-ml-trees"],
+    "xgboost": ["top-ml-trees"],
+    "classification": ["top-ml-super-reg", "top-ml-trees"],
+    "scikit-learn": ["top-ml-super-reg", "top-ml-trees"],
+    "sklearn": ["top-ml-super-reg", "top-ml-trees"],
+    "supervised learning": ["top-ml-super-reg"],
+    "unsupervised learning": ["top-ml-trees"],
+    # Deep Learning
+    "deep learning": ["top-dl-nn", "top-dl-pytorch"],
+    "neural networks": ["top-dl-nn"],
+    "pytorch": ["top-dl-pytorch"],
+    "tensorflow": ["top-dl-pytorch"],
+    "keras": ["top-dl-pytorch", "top-dl-nn"],
+    "cnn": ["top-dl-nn"],
+    "rnn": ["top-dl-nn"],
+    # NLP
+    "nlp": ["top-nlp-tokenizers"],
+    "natural language processing": ["top-nlp-tokenizers"],
+    "tokenization": ["top-nlp-tokenizers"],
+    "transformers": ["top-nlp-tokenizers", "top-genai-attention"],
+    "embeddings": ["top-nlp-tokenizers"],
+    "hugging face": ["top-nlp-tokenizers"],
+    "huggingface": ["top-nlp-tokenizers"],
+    # GenAI / LLM
+    "llm": ["top-genai-attention", "top-genai-finetuning"],
+    "large language model": ["top-genai-attention", "top-genai-finetuning"],
+    "generative ai": ["top-genai-attention", "top-genai-finetuning"],
+    "fine-tuning": ["top-genai-finetuning"],
+    "lora": ["top-genai-finetuning"],
+    "prompt engineering": ["top-genai-finetuning"],
+    "attention": ["top-genai-attention"],
+    "self-attention": ["top-genai-attention"],
+    # RAG
+    "rag": ["top-genai-rag"],
+    "retrieval augmented generation": ["top-genai-rag"],
+    "vector database": ["top-genai-rag"],
+    "vector db": ["top-genai-rag"],
+    "langchain": ["top-genai-rag"],
+    "llamaindex": ["top-genai-rag"],
+    # MLOps
+    "fastapi": ["top-mlops-fastapi"],
+    "flask": ["top-mlops-fastapi"],
+    "rest api": ["top-mlops-fastapi"],
+    "docker": ["top-mlops-docker"],
+    "kubernetes": ["top-mlops-docker"],
+    "mlops": ["top-mlops-fastapi", "top-mlops-docker"],
+    "deployment": ["top-mlops-docker"],
+    "ci/cd": ["top-mlops-docker"],
+}
+
+
+async def _seed_knowledge_from_onboarding(
+    user_id: str,
+    user_profile: Optional[dict[str, Any]],
+) -> None:
+    """Seeds initial topic mastery from onboarding known_skills and experience level.
+    
+    This is called once when the user's roadmap is first loaded. It maps
+    the free-text skill names from onboarding to taxonomy topic IDs and
+    sets initial self-reported mastery based on experience level.
+    """
+    from app.services.knowledge_state_service import update_topic_evidence
+
+    valid_uid = _ensure_valid_uuid(user_id)
+    if valid_uid in _SEEDED_USERS:
+        return
+    _SEEDED_USERS.add(valid_uid)
+
+    if not user_profile or not user_profile.get("profile_metadata"):
+        return
+
+    meta = user_profile["profile_metadata"]
+    known_skills = meta.get("known_skills", [])
+    experience_level = meta.get("experience_level", "beginner")
+
+    if not known_skills:
+        return
+
+    # Map experience level to conservative self-report mastery score
+    base_mastery = {"beginner": 25, "intermediate": 50, "advanced": 75}.get(experience_level, 30)
+
+    # Collect all matching topic IDs from known skill keywords
+    matched_topic_ids: set[str] = set()
+    for skill_name in known_skills:
+        skill_lower = skill_name.lower().strip()
+        # Direct keyword match
+        if skill_lower in _SKILL_KEYWORD_MAP:
+            matched_topic_ids.update(_SKILL_KEYWORD_MAP[skill_lower])
+        else:
+            # Fuzzy substring match
+            for keyword, topic_ids in _SKILL_KEYWORD_MAP.items():
+                if keyword in skill_lower or skill_lower in keyword:
+                    matched_topic_ids.update(topic_ids)
+
+    logger.info(
+        "Seeding knowledge state for user %s: %d skills mapped to %d topics (experience=%s, base_mastery=%d)",
+        valid_uid, len(known_skills), len(matched_topic_ids), experience_level, base_mastery,
+    )
+
+    # Seed each matched topic with self-report evidence
+    for topic_id in matched_topic_ids:
+        try:
+            await update_topic_evidence(valid_uid, topic_id, base_mastery, source="self_report")
+        except Exception as e:
+            logger.warning("Could not seed topic %s for user %s: %s", topic_id, valid_uid, e)
+
+
 
 async def get_learner_stage_progress_from_db(user_id: str) -> list[dict[str, Any]]:
     """Loads all tracked stage progresses for a user from Supabase."""
@@ -774,64 +921,88 @@ async def get_roadmap_overview(
     user_name: str = "Learner",
     target_role: str = "AI/ML Engineer",
 ) -> RoadmapOverviewResponse:
-    """Builds the full Roadmap Overview with metrics, active position, blockers, and next action."""
-    stages = await evaluate_learner_roadmap(user_id)
-    total_stages = len(stages)
-    completed_count = sum(1 for s in stages if s.status == "COMPLETED")
-    overall_progress = round((completed_count / total_stages) * 100)
+    """Builds the full Roadmap Overview using the dynamic intelligence pipeline.
+    
+    This delegates to adaptive_roadmap_generator which:
+    1. Reads the learner's knowledge state (seeded from onboarding known_skills)
+    2. Identifies gaps for the target role
+    3. Generates a personalized sequenced curriculum
+    """
+    from app.services.adaptive_roadmap_generator import generate_personalized_roadmap
 
-    # Find current active stage and next stage
-    current_stage = next((s for s in stages if s.status == "IN_PROGRESS"), None)
-    if not current_stage:
-        current_stage = next((s for s in stages if s.status in ("AVAILABLE", "NOT_STARTED")), stages[0])
+    # Load user profile for weekly hours and timeline preferences
+    user_profile = await get_user_profile_from_db(user_id)
+    weekly_hours = 10
+    target_months = 6
+    if user_profile and user_profile.get("profile_metadata"):
+        meta = user_profile["profile_metadata"]
+        weekly_hours = int(meta.get("weekly_hours", 10) or 10)
+        target_months = int(meta.get("target_completion_months", 6) or 6)
+        extracted_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or meta.get("job_specialization")
+        if extracted_role:
+            target_role = extracted_role
 
-    next_stage = next(
-        (s for s in stages if s.id > (current_stage.id if current_stage else 0) and s.status in ("AVAILABLE", "NOT_STARTED", "LOCKED")),
-        None,
+    # Seed knowledge state from onboarding profile (happens once on first load)
+    await _seed_knowledge_from_onboarding(user_id, user_profile)
+
+    # Generate the personalized roadmap through the pipeline
+    personalized = await generate_personalized_roadmap(
+        user_id=user_id,
+        target_role_title=target_role,
+        user_name=user_name,
+        weekly_hours=weekly_hours,
+        target_months=target_months,
     )
 
-    # Calculate remaining weeks
-    remaining_weeks = sum(
-        int(s.estimated_duration.split()[0])
-        for s in stages
-        if s.status != "COMPLETED" and s.estimated_duration.split()[0].isdigit()
-    ) or 20
+    # Convert PersonalizedRoadmapStage -> RoadmapStageSummary for frontend compatibility
+    stages: list[RoadmapStageSummary] = []
+    for ps in personalized.stages:
+        stages.append(RoadmapStageSummary(
+            id=ps.id,
+            title=ps.title,
+            status=ps.status,
+            difficulty=ps.difficulty,
+            estimated_duration=ps.estimated_duration,
+            progress=ps.progress,
+            is_final_capstone=ps.is_final_capstone,
+            skills=ps.skills,
+        ))
 
-    # Determine blocker message if any
-    current_blocker = None
-    if next_stage and next_stage.status == "LOCKED":
-        current_blocker = f"Stage '{next_stage.title}' is locked: Complete '{current_stage.title}' prerequisites first."
-
-    # Next recommended action
-    next_action = f"Continue learning '{current_stage.title}' to maintain your target pace."
-    if current_stage and current_stage.progress < 50:
-        next_action = f"Complete the core syllabus and practice problems for '{current_stage.title}'."
-    elif current_stage and current_stage.progress >= 50:
-        next_action = f"Take the diagnostic assessment for '{current_stage.title}' to unlock the next milestone."
-
-    # Sync full roadmap structure and overall progress to roadmaps table in Supabase
-    try:
-        await save_user_roadmap_to_db(
-            user_id=user_id,
-            target_role=target_role,
-            stages_data=[s.dict() for s in stages],
-            overall_progress=overall_progress,
+    current_stage_summary = None
+    if personalized.current_stage:
+        cs = personalized.current_stage
+        current_stage_summary = RoadmapStageSummary(
+            id=cs.id, title=cs.title, status=cs.status,
+            difficulty=cs.difficulty, estimated_duration=cs.estimated_duration,
+            progress=cs.progress, is_final_capstone=cs.is_final_capstone, skills=cs.skills,
         )
-    except Exception as sync_err:
-        logger.warning("Could not sync roadmaps table in background: %s", sync_err)
+
+    next_stage_summary = None
+    if personalized.next_stage:
+        ns = personalized.next_stage
+        next_stage_summary = RoadmapStageSummary(
+            id=ns.id, title=ns.title, status=ns.status,
+            difficulty=ns.difficulty, estimated_duration=ns.estimated_duration,
+            progress=ns.progress, is_final_capstone=ns.is_final_capstone, skills=ns.skills,
+        )
+
+    # Cache the full personalized stages in memory for get_stage_details
+    _PIPELINE_STAGE_CACHE[user_id] = personalized
 
     return RoadmapOverviewResponse(
         user_id=user_id,
         user_name=user_name,
-        target_role=target_role,
-        overall_progress=overall_progress,
-        completed_stages=completed_count,
-        total_stages=total_stages,
-        current_stage=current_stage,
-        next_stage=next_stage,
-        estimated_remaining_weeks=remaining_weeks,
-        current_blocker=current_blocker,
-        next_recommended_action=next_action,
+        target_role=personalized.target_role,
+        overall_progress=personalized.overall_progress,
+        completed_stages=personalized.completed_stages,
+        total_stages=personalized.total_stages,
+        current_stage=current_stage_summary,
+        next_stage=next_stage_summary,
+        estimated_remaining_weeks=personalized.estimated_remaining_weeks,
+        weekly_hours_budget=weekly_hours,
+        target_timeline_months=target_months,
+        current_blocker=personalized.current_blocker,
+        next_recommended_action=personalized.next_recommended_action,
         stages=stages,
     )
 
@@ -841,88 +1012,80 @@ async def get_stage_details(
     stage_id: int,
     target_role: str = "AI/ML Engineer",
 ) -> Optional[RoadmapStageDetail]:
-    """Returns comprehensive stage details with live topic masteries, prerequisite checks, and actions."""
-    canonical_stage = next((s for s in CANONICAL_ROADMAP_STAGES if s["id"] == stage_id), None)
-    if not canonical_stage:
+    """Returns comprehensive stage details from the pipeline-generated personalized roadmap."""
+    
+    # Try to get from pipeline cache first; if not cached, generate
+    if user_id not in _PIPELINE_STAGE_CACHE:
+        await get_roadmap_overview(user_id, "Learner", target_role)
+    
+    cached = _PIPELINE_STAGE_CACHE.get(user_id)
+    if not cached:
+        return None
+    
+    # Find the stage by ID from the pipeline-generated stages
+    pipeline_stage = next((s for s in cached.stages if s.id == stage_id), None)
+    if not pipeline_stage:
         return None
 
-    # Load evaluated stages to get real-time status
-    all_stages = await evaluate_learner_roadmap(user_id)
-    stage_summary = next((s for s in all_stages if s.id == stage_id), None)
-    current_status = stage_summary.status if stage_summary else "LOCKED"
-    current_progress = stage_summary.progress if stage_summary else 0
-
-    # Load topic progress
-    topic_progress = await get_user_topic_progress_from_db(user_id)
-    mastery_map: dict[str, int] = {t["skill_id"]: t["mastery"] for t in topic_progress}
-
-    # Build topic items
+    # Convert pipeline topics to RoadmapTopicItem format
     topics: list[RoadmapTopicItem] = []
     completed_topics_count = 0
-
-    for raw_topic in canonical_stage.get("topics", []):
-        skill_id = raw_topic["skill_id"]
-        # Use live mastery if available or deterministic baseline
-        live_mastery = mastery_map.get(skill_id, 30 if current_status == "IN_PROGRESS" else 85 if current_status == "COMPLETED" else 0)
-
-        if current_status == "COMPLETED" or live_mastery >= 70:
-            top_status = "COMPLETED"
+    for pt in pipeline_stage.topics:
+        top_status_mapped = pt.status
+        if top_status_mapped == "COMPLETED":
             completed_topics_count += 1
-        elif current_status == "IN_PROGRESS":
-            top_status = "IN_PROGRESS" if live_mastery > 0 else "NOT_STARTED"
-        else:
-            top_status = "LOCKED"
+        # Map IN_PROGRESS -> IN_PROGRESS, AVAILABLE -> NOT_STARTED for frontend compat
+        if top_status_mapped == "AVAILABLE":
+            top_status_mapped = "NOT_STARTED"
+        topics.append(RoadmapTopicItem(
+            id=pt.id,
+            title=pt.title,
+            skill_id=pt.skill_id,
+            skill_name=pt.skill_name,
+            mastery=pt.current_mastery,
+            status=top_status_mapped,
+            estimated_time=f"{pt.estimated_hours:.0f} hours",
+            key_concepts=pt.key_concepts,
+        ))
 
-        topics.append(
-            RoadmapTopicItem(
-                id=raw_topic["id"],
-                title=raw_topic["title"],
-                skill_id=skill_id,
-                skill_name=raw_topic["skill_name"],
-                mastery=live_mastery,
-                status=top_status,
-                estimated_time=raw_topic["estimated_time"],
-                key_concepts=raw_topic.get("key_concepts", []),
-            )
-        )
+    # Convert pipeline resources to LearningResourceItem
+    resources: list[LearningResourceItem] = []
+    for pr in pipeline_stage.resources:
+        res_type = pr.type.upper()
+        if res_type not in ("COURSE", "DOCUMENTATION", "VIDEO", "PRACTICE", "ASSESSMENT"):
+            res_type = "COURSE"
+        resources.append(LearningResourceItem(
+            id=pr.id,
+            title=pr.title,
+            type=res_type,
+            provider=pr.provider,
+            duration=pr.duration,
+            url=pr.url,
+        ))
 
-    # Prerequisite verification
+    # Prerequisite checks from pipeline stage
     prereq_checks: list[PrerequisiteCheckItem] = []
-    for prereq_name in canonical_stage["prerequisites"]:
-        prereq_stage = next((s for s in CANONICAL_ROADMAP_STAGES if s["title"] == prereq_name), None)
-        if prereq_stage:
-            is_satisfied = any(s.id == prereq_stage["id"] and s.status == "COMPLETED" for s in all_stages)
+    for prereq_name in pipeline_stage.prerequisites:
+        prereq_ps = next((s for s in cached.stages if s.title == prereq_name), None)
+        if prereq_ps:
+            is_satisfied = prereq_ps.status == "COMPLETED"
             missing = []
             if not is_satisfied:
-                for sk in prereq_stage["skills"]:
-                    missing.append({"skill": sk, "required_mastery": 60, "current_mastery": 45})
+                for sk in prereq_ps.skills:
+                    missing.append({"skill": sk, "required_mastery": 75, "current_mastery": prereq_ps.progress})
+            prereq_checks.append(PrerequisiteCheckItem(
+                stage_id=prereq_ps.id,
+                stage_title=prereq_ps.title,
+                required_skills=prereq_ps.skills,
+                satisfied=is_satisfied,
+                missing_skills=missing,
+            ))
 
-            prereq_checks.append(
-                PrerequisiteCheckItem(
-                    stage_id=prereq_stage["id"],
-                    stage_title=prereq_stage["title"],
-                    required_skills=prereq_stage["skills"],
-                    satisfied=is_satisfied,
-                    missing_skills=missing,
-                )
-            )
-
-    # Convert resources
-    resources: list[LearningResourceItem] = [
-        LearningResourceItem(
-            id=r["id"],
-            title=r["title"],
-            type=r["type"],
-            provider=r["provider"],
-            duration=r["duration"],
-            url=r.get("url", "#"),
-        )
-        for r in canonical_stage.get("resources", [])
-    ]
-
-    # Compute Next Best Action & Available Actions
+    # Next Best Action & Available Actions
+    current_status = pipeline_stage.status
     if current_status == "IN_PROGRESS":
-        next_action = f"Complete '{topics[0].title if topics else canonical_stage['title']}' to advance your stage mastery."
+        first_topic_title = topics[0].title if topics else pipeline_stage.title
+        next_action = f"Complete '{first_topic_title}' to advance your stage mastery."
         actions = ["RESUME_STAGE", "ASK_MENTOR", "VIEW_SKILLS"]
     elif current_status in ("AVAILABLE", "NOT_STARTED"):
         next_action = f"Start Stage {stage_id} — review the syllabus and initiate topic learning."
@@ -931,29 +1094,28 @@ async def get_stage_details(
         next_action = "Stage fully completed! You can review materials or practice challenging problems."
         actions = ["REVIEW_STAGE", "ASK_MENTOR", "VIEW_SKILLS"]
     else:
-        # LOCKED
-        next_action = f"Complete prerequisites ({', '.join(canonical_stage['prerequisites'])}) to unlock this stage."
+        next_action = f"Complete prerequisites ({', '.join(pipeline_stage.prerequisites)}) to unlock this stage."
         actions = ["VIEW_PREREQUISITES", "ASK_MENTOR"]
 
     return RoadmapStageDetail(
         id=stage_id,
-        title=canonical_stage["title"],
+        title=pipeline_stage.title,
         status=current_status,
-        difficulty=canonical_stage["difficulty"],
-        estimated_duration=canonical_stage["estimated_duration"],
-        progress=current_progress,
+        difficulty=pipeline_stage.difficulty,
+        estimated_duration=pipeline_stage.estimated_duration,
+        progress=pipeline_stage.progress,
         completed_topics=completed_topics_count,
         total_topics=len(topics),
-        why_learn=canonical_stage["why_learn"],
-        career_relevance=canonical_stage.get("career_relevance", ""),
-        prerequisites=canonical_stage["prerequisites"],
+        why_learn=pipeline_stage.why_in_roadmap,
+        career_relevance=pipeline_stage.career_relevance,
+        prerequisites=pipeline_stage.prerequisites,
         prerequisite_checks=prereq_checks,
-        skills=canonical_stage["skills"],
-        learnings=canonical_stage["learnings"],
+        skills=pipeline_stage.skills,
+        learnings=[pipeline_stage.completion_criteria],
         topics=topics,
         resources=resources,
-        project=canonical_stage["project"],
-        is_final_capstone=(stage_id == len(CANONICAL_ROADMAP_STAGES)),
+        project=pipeline_stage.completion_criteria,
+        is_final_capstone=pipeline_stage.is_final_capstone,
         next_best_action=next_action,
         actions_available=actions,
     )
@@ -961,8 +1123,14 @@ async def get_stage_details(
 
 async def start_stage(user_id: str, stage_id: int) -> StageStartResponse:
     """Transitions an unlocked stage to IN_PROGRESS."""
-    all_stages = await evaluate_learner_roadmap(user_id)
-    stage = next((s for s in all_stages if s.id == stage_id), None)
+    # Get from pipeline cache
+    if user_id not in _PIPELINE_STAGE_CACHE:
+        await get_roadmap_overview(user_id, "Learner", "AI/ML Engineer")
+
+    cached = _PIPELINE_STAGE_CACHE.get(user_id)
+    stage = None
+    if cached:
+        stage = next((s for s in cached.stages if s.id == stage_id), None)
     if not stage:
         raise ValueError("Stage not found")
 
@@ -977,6 +1145,9 @@ async def start_stage(user_id: str, stage_id: int) -> StageStartResponse:
         progress=stage.progress if stage.progress > 0 else 10,
         started_at=started_at,
     )
+
+    # Invalidate pipeline cache to force re-generation on next load
+    _PIPELINE_STAGE_CACHE.pop(user_id, None)
 
     return StageStartResponse(
         stage_id=stage_id,
@@ -997,9 +1168,12 @@ async def complete_stage(user_id: str, stage_id: int) -> StageCompleteResponse:
         completed_at=completed_at,
     )
 
+    # Invalidate pipeline cache to force re-generation
+    _PIPELINE_STAGE_CACHE.pop(user_id, None)
+
     # Re-evaluate roadmap to determine which downstream stages unlocked
-    updated_stages = await evaluate_learner_roadmap(user_id)
-    unlocked = [s.id for s in updated_stages if s.status in ("AVAILABLE", "NOT_STARTED", "IN_PROGRESS")]
+    overview = await get_roadmap_overview(user_id, "Learner", "AI/ML Engineer")
+    unlocked = [s.id for s in overview.stages if s.status in ("AVAILABLE", "NOT_STARTED", "IN_PROGRESS")]
 
     return StageCompleteResponse(
         stage_id=stage_id,
@@ -1008,3 +1182,4 @@ async def complete_stage(user_id: str, stage_id: int) -> StageCompleteResponse:
         message=f"Stage {stage_id} completed. Downstream roadmap updated.",
         unlocked_stages=unlocked,
     )
+

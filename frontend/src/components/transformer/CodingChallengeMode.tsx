@@ -35,7 +35,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'LeetCode',
     difficulty: 'Easy',
     relevanceExplanation: 'Tests foundational array iteration and O(1) hash lookup efficiency.',
-    externalUrl: '#',
+    externalUrl: 'https://leetcode.com/problems/two-sum/',
     solved: false
   },
   {
@@ -46,7 +46,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'LeetCode',
     difficulty: 'Easy',
     relevanceExplanation: 'Great practice for frequency counters and dictionary manipulation.',
-    externalUrl: '#',
+    externalUrl: 'https://leetcode.com/problems/valid-anagram/',
     solved: true
   },
   {
@@ -57,7 +57,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'HackerRank',
     difficulty: 'Medium',
     relevanceExplanation: 'Forces you to write clean, Pythonic one-liners for nested loops.',
-    externalUrl: '#',
+    externalUrl: 'https://www.hackerrank.com/challenges/nested-list/problem',
     solved: false
   },
   {
@@ -67,8 +67,8 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     subtopic: ['Hash Maps', 'Array & Strings'],
     platform: 'LeetCode',
     difficulty: 'Medium',
-    relevanceExplanation: 'Requires advanced dictionary usage (e.g. dict of lists) common in ML feature engineering.',
-    externalUrl: '#',
+    relevanceExplanation: 'Requires advanced dictionary usage common in ML feature engineering.',
+    externalUrl: 'https://leetcode.com/problems/group-anagrams/',
     solved: false
   },
   {
@@ -79,7 +79,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'HackerRank',
     difficulty: 'Easy',
     relevanceExplanation: 'Introduces itertools, crucial for generating combinatorial data in AI.',
-    externalUrl: '#',
+    externalUrl: 'https://www.hackerrank.com/challenges/itertools-permutations/problem',
     solved: false
   },
   {
@@ -90,7 +90,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'LeetCode',
     difficulty: 'Medium',
     relevanceExplanation: 'Teaches 2D array traversal, the building block of image processing and tensor ops.',
-    externalUrl: '#',
+    externalUrl: 'https://leetcode.com/problems/search-a-2d-matrix/',
     solved: false
   },
   {
@@ -101,7 +101,7 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     platform: 'LeetCode',
     difficulty: 'Hard',
     relevanceExplanation: 'Advanced array manipulation and spatial reasoning required for dynamic programming.',
-    externalUrl: '#',
+    externalUrl: 'https://leetcode.com/problems/trapping-rain-water/',
     solved: false
   },
   {
@@ -109,10 +109,10 @@ const MOCK_PROBLEMS: PracticeProblem[] = [
     title: 'Find the Island Perimeter',
     topic: 'Graphs',
     subtopic: ['Matrix Manipulation'],
-    platform: 'GeeksforGeeks',
-    difficulty: 'Medium',
+    platform: 'LeetCode',
+    difficulty: 'Easy',
     relevanceExplanation: 'Excellent introduction to grid-based traversal (DFS/BFS).',
-    externalUrl: '#',
+    externalUrl: 'https://leetcode.com/problems/island-perimeter/',
     solved: false
   }
 ];

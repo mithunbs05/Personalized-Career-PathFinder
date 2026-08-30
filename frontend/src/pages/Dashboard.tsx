@@ -13,32 +13,23 @@ import {
   RoadmapStageSummary,
 } from '../services/roadmap.service';
 
-// Fallback baseline stages if initial load is pending
-const DEFAULT_STAGES: RoadmapStageSummary[] = [
-  { id: 1, title: 'Programming Foundations', status: 'COMPLETED', difficulty: 'Beginner', estimated_duration: '2 Weeks', progress: 100, is_final_capstone: false, skills: ['Python OOP', 'Data Types'] },
-  { id: 2, title: 'Python for AI', status: 'COMPLETED', difficulty: 'Beginner', estimated_duration: '3 Weeks', progress: 100, is_final_capstone: false, skills: ['NumPy & Pandas', 'Data Wrangling'] },
-  { id: 3, title: 'Mathematics & Statistics', status: 'IN_PROGRESS', difficulty: 'Intermediate', estimated_duration: '4 Weeks', progress: 45, is_final_capstone: false, skills: ['Linear Algebra', 'Calculus', 'Probability', 'Optimization'] },
-  { id: 4, title: 'Machine Learning', status: 'AVAILABLE', difficulty: 'Intermediate', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['Scikit-Learn', 'Regression', 'Random Forests'] },
-  { id: 5, title: 'Deep Learning', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '5 Weeks', progress: 0, is_final_capstone: false, skills: ['PyTorch', 'Neural Nets'] },
-  { id: 6, title: 'Natural Language Processing', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '3 Weeks', progress: 0, is_final_capstone: false, skills: ['Transformers', 'Tokenization'] },
-  { id: 7, title: 'Generative AI & LLMs', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['Fine-Tuning (LoRA)', 'Prompt Engineering'] },
-  { id: 8, title: 'RAG & AI Applications', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['RAG', 'Vector DBs'] },
-  { id: 9, title: 'Deployment & MLOps', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['FastAPI & Docker', 'CI/CD'] },
-  { id: 10, title: 'Final AI Engineering Capstone', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: true, skills: ['End-to-End System Design'] },
-];
+import { LearnerProfileTab } from '../components/profile/LearnerProfileTab';
+
+// No fallback baseline stages — the pipeline generates the real personalized roadmap
+const DEFAULT_STAGES: RoadmapStageSummary[] = [];
 
 export const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, saveOnboarding } = useAuth();
   const [overview, setOverview] = useState<RoadmapOverviewResponse | null>(null);
 
   // Persist selected tab across page reloads
-  const [activeTab, setActiveTab] = useState<'roadmap' | 'skills' | 'mentor' | 'practice'>(() => {
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'skills' | 'mentor' | 'practice' | 'profile'>(() => {
     const hash = window.location.hash.replace('#', '');
-    if (['roadmap', 'skills', 'mentor', 'practice'].includes(hash)) {
+    if (['roadmap', 'skills', 'mentor', 'practice', 'profile'].includes(hash)) {
       return hash as any;
     }
     const saved = localStorage.getItem('pathai_active_tab');
-    if (saved && ['roadmap', 'skills', 'mentor', 'practice'].includes(saved)) {
+    if (saved && ['roadmap', 'skills', 'mentor', 'practice', 'profile'].includes(saved)) {
       return saved as any;
     }
     return 'roadmap';
@@ -79,22 +70,33 @@ export const Dashboard: React.FC = () => {
     localStorage.setItem('pathai_dark_mode', String(isDarkMode));
   }, [isDarkMode]);
 
-  // Load Roadmap Overview from Backend
-  const loadRoadmap = useCallback(async () => {
+  // Load Roadmap Overview from Backend with target role
+  const loadRoadmap = useCallback(async (roleOverride?: string) => {
     try {
       setIsLoadingOverview(true);
-      const data = await roadmapService.getRoadmap();
+      const roleToFetch = roleOverride || user?.profile?.targetGoal;
+      const data = await roadmapService.getRoadmap(roleToFetch);
       setOverview(data);
     } catch (err) {
       console.warn('Failed to load roadmap from backend, using fallback:', err);
     } finally {
       setIsLoadingOverview(false);
     }
-  }, []);
+  }, [user?.profile?.targetGoal]);
 
   useEffect(() => {
     loadRoadmap();
   }, [loadRoadmap]);
+
+  const handleSwitchRole = async (newRole: string) => {
+    if (user?.profile) {
+      await saveOnboarding({
+        ...user.profile,
+        targetGoal: newRole,
+      });
+    }
+    await loadRoadmap(newRole);
+  };
 
   // Load Selected Stage Details from Backend
   useEffect(() => {
@@ -137,13 +139,31 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // Cross-system navigation to AI Mentor with contextual state
-  const handleNavigateToMentor = (context: {
-    stageTitle: string;
-    skillName: string;
+  const [mentorContext, setMentorContext] = useState<{
+    stageTitle?: string;
+    stageId?: number;
+    skillName?: string;
+    skillFocus?: string;
     topicTitle?: string;
-    mastery: number;
+    mastery?: number;
+    mode?: 'learn' | 'practice' | 'assess';
+    reason?: string;
+  } | null>(null);
+
+  // Cross-system navigation to AI Mentor with contextual state
+  const handleNavigateToMentor = (context?: {
+    stageTitle?: string;
+    stageId?: number;
+    skillName?: string;
+    skillFocus?: string;
+    topicTitle?: string;
+    mastery?: number;
+    mode?: 'learn' | 'practice' | 'assess';
+    reason?: string;
   }) => {
+    if (context) {
+      setMentorContext(context);
+    }
     setActiveTab('mentor');
   };
 
@@ -153,7 +173,9 @@ export const Dashboard: React.FC = () => {
   };
 
   const stagesList = overview?.stages || DEFAULT_STAGES;
-  const progressPercentage = overview?.overall_progress || 20;
+  const progressPercentage = overview?.overall_progress ?? 0;
+  const streakDays = overview?.completed_stages ? `${overview.completed_stages * 3 + 1} Days` : '1 Day';
+  const loggedTimeHrs = overview?.overall_progress ? `${((overview.overall_progress / 100) * 12).toFixed(1)} hrs` : '0.0 hrs';
 
   return (
     <div className={isDarkMode ? 'dark-mode-active' : ''}>
@@ -169,7 +191,7 @@ export const Dashboard: React.FC = () => {
                 Path<span className="text-[#ff4726]">AI</span>
               </span>
               <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-full text-[10px] font-extrabold tracking-wider text-slate-600 dark:text-slate-300 uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {overview?.target_role || 'AI/ML ENGINEER'}
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {overview?.target_role || user?.profile?.targetGoal || 'DATA SCIENTIST'}
               </div>
             </div>
 
@@ -195,7 +217,22 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'profile'
+                    ? 'bg-[#ff4726]/10 text-[#ff4726] ring-1 ring-[#ff4726]/40'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="View Learner Profile"
+              >
+                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#ff4726] to-[#ff7d47] text-white flex items-center justify-center font-black text-[11px] shadow-xs">
+                  {(user?.name || overview?.user_name || 'L').charAt(0).toUpperCase()}
+                </div>
+                <span className="hidden sm:inline font-semibold text-xs">{user?.name || overview?.user_name || 'Profile'}</span>
+              </button>
+
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className="p-1.5 rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
@@ -225,10 +262,12 @@ export const Dashboard: React.FC = () => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span> Learner Cockpit
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                    Welcome back, {user?.name || overview?.user_name || 'Learner'}!
+                    {(overview?.completed_stages && overview.completed_stages > 0) || (overview?.overall_progress && overview.overall_progress > 0)
+                      ? `Welcome back, ${user?.name || overview?.user_name || 'Learner'}!`
+                      : `Welcome, ${user?.name || overview?.user_name || 'Learner'}!`}
                   </h1>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">
-                    Target Role: <strong className="text-slate-900 dark:text-white">{overview?.target_role || 'AI/ML Engineer'}</strong> • Target Pace: <strong className="text-slate-900 dark:text-white">15 hrs/week</strong> • Remaining: <strong className="text-slate-900 dark:text-white">~{overview?.estimated_remaining_weeks || 18} weeks</strong>
+                    Target Role: <strong className="text-slate-900 dark:text-white">{overview?.target_role || user?.profile?.targetGoal || 'Data Scientist'}</strong> • Target Pace: <strong className="text-slate-900 dark:text-white">{overview?.weekly_hours_budget || user?.profile?.weeklyHours || 10} hrs/week</strong> • Remaining: <strong className="text-slate-900 dark:text-white">~{overview?.estimated_remaining_weeks || 18} weeks</strong>
                   </p>
                 </div>
 
@@ -239,7 +278,7 @@ export const Dashboard: React.FC = () => {
                       <Flame className="w-5 h-5" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-black text-lg leading-none">14 Days</span>
+                      <span className="font-black text-lg leading-none">{streakDays}</span>
                       <span className="text-slate-500 text-[10px] uppercase font-bold mt-1 tracking-wider">Streak</span>
                     </div>
                   </div>
@@ -250,7 +289,7 @@ export const Dashboard: React.FC = () => {
                       <Clock className="w-5 h-5" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-black text-lg leading-none">28.5 hrs</span>
+                      <span className="font-black text-lg leading-none">{loggedTimeHrs}</span>
                       <span className="text-slate-500 text-[10px] uppercase font-bold mt-1 tracking-wider">Logged Time</span>
                     </div>
                   </div>
@@ -329,11 +368,22 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
           ) : activeTab === 'skills' ? (
-            <SkillMatrix />
+            <SkillMatrix 
+              onNavigateToMentor={handleNavigateToMentor}
+              onNavigateToRoadmap={() => setActiveTab('roadmap')}
+            />
           ) : activeTab === 'mentor' ? (
-            <AIMentorPage stages={stagesList as any} user={user} onNavigate={setActiveTab} />
+            <AIMentorPage
+              stages={stagesList as any}
+              user={user}
+              overview={overview}
+              initialContext={mentorContext}
+              onNavigate={setActiveTab}
+            />
           ) : activeTab === 'practice' ? (
-            <MultiModalTransformer />
+            <MultiModalTransformer initialStageId={selectedStageId || overview?.current_stage?.id || 1} />
+          ) : activeTab === 'profile' ? (
+            <LearnerProfileTab overview={overview} onNavigateTab={setActiveTab} />
           ) : null}
         </main>
       </div>

@@ -111,7 +111,7 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
             <h2 className="text-xl font-black text-slate-900 dark:text-white">Roadmap Overview</h2>
           </div>
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-            {overview?.target_role || 'AI/ML Engineer'}
+            {overview?.target_role || 'Data Scientist'}
           </span>
         </div>
 
@@ -120,17 +120,17 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
           <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-300">Curriculum Completion</span>
-              <span className="text-2xl font-black text-[#ea580c]">{overview?.overall_progress || 20}%</span>
+              <span className="text-2xl font-black text-[#ea580c]">{overview?.overall_progress ?? 0}%</span>
             </div>
             <div className="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500"
-                style={{ width: `${overview?.overall_progress || 20}%` }}
+                style={{ width: `${overview?.overall_progress ?? 0}%` }}
               />
             </div>
             <div className="flex items-center justify-between text-xs text-slate-300 pt-1">
-              <span>{overview?.completed_stages || 2} of {overview?.total_stages || 10} Stages Completed</span>
-              <span>~{overview?.estimated_remaining_weeks || 18} Weeks Remaining</span>
+              <span>{overview?.completed_stages ?? 0} of {overview?.total_stages ?? (overview?.stages?.length ?? 5)} Stages Completed</span>
+              <span>~{overview?.estimated_remaining_weeks ?? 12} Weeks Remaining</span>
             </div>
           </div>
 

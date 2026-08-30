@@ -1,7 +1,7 @@
 // Strict TypeScript Types for CareerGPS / LearnAI Role-Based Learning Roadmap
 
 export type ResourceType = 'COURSE' | 'DOCUMENTATION' | 'VIDEO' | 'PRACTICE' | 'ASSESSMENT';
-export type StageStatus = 'COMPLETED' | 'IN_PROGRESS' | 'LOCKED' | 'NOT_STARTED';
+export type StageStatus = 'COMPLETED' | 'IN_PROGRESS' | 'LOCKED' | 'NOT_STARTED' | 'AVAILABLE';
 
 export interface LearningResource {
   id: string;
@@ -53,15 +53,16 @@ export interface RoadmapStage {
   status: StageStatus;
   difficulty: string;
   estimatedDuration: string;
-  whyLearn: string;
-  prerequisites: string[];
+  whyLearn?: string;
+  prerequisites?: string[];
   skills: string[];
-  learnings: string[];
-  resources: LearningResource[];
-  project: string;
-  assessment: string;
+  learnings?: string[];
+  resources?: LearningResource[];
+  project?: string;
+  assessment?: string;
   topics?: Topic[]; // Added for Learning System
   isFinalCapstone?: boolean;
+  progress?: number;
 }
 
 export interface RoadmapData {

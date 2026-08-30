@@ -101,46 +101,68 @@ async def get_mentor_context(
     # Load user profile from DB if available
     user_profile = await get_user_profile_from_db(user_id)
     target_role = "AI/ML Engineer"
+    user_name = user.get("name", "Learner")
     if user_profile and user_profile.get("profile_metadata"):
         meta = user_profile["profile_metadata"]
-        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        target_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or meta.get("role") or target_role
 
-    # Load topic progress from DB
-    topic_progress = await get_user_topic_progress_from_db(user_id)
-    topic_override_map = {t["skill_id"]: t["mastery"] for t in topic_progress}
+    # 1. Fetch dynamic roadmap overview
+    from app.services.roadmap_service import get_roadmap_overview
+    from app.services.gap_analysis_service import analyze_learner_gaps
+    from app.services.knowledge_state_service import get_or_init_knowledge_state
 
-    # Build active skills
-    active_skills = [
-        {
-            **s,
-            "progress": topic_override_map.get(s["id"], s["progress"]),
-        }
-        for s in CANONICAL_SKILLS
-    ]
+    roadmap_overview = await get_roadmap_overview(user_id=user_id, user_name=user_name, target_role=target_role)
+    gap_analysis = await analyze_learner_gaps(user_id=user_id, target_role=target_role)
+    knowledge_states = await get_or_init_knowledge_state(user_id=user_id)
 
-    current_stage = next((s for s in CANONICAL_STAGES if s["status"] == "IN_PROGRESS"), CANONICAL_STAGES[2])
-    completed_count = sum(1 for s in CANONICAL_STAGES if s["status"] == "COMPLETED")
-    overall_progress = round((completed_count / len(CANONICAL_STAGES)) * 100)
+    # Current dynamic stage
+    current_stage_title = roadmap_overview.current_stage.title if roadmap_overview.current_stage else "Programming"
+    overall_progress = roadmap_overview.overall_progress
 
-    focus = calculate_todays_focus(
-        stages=CANONICAL_STAGES,
-        user_skills=active_skills,
-        user_name=user.get("name", "Learner"),
-        target_role=target_role,
-        topic_progress=topic_progress,
+    # Determine dynamic Today's Focus based on root-cause gaps
+    focus_topic_title = "Functions, Scope & Error Handling"
+    focus_skill_name = "Python Functions"
+    focus_domain = "Programming & Data Structures"
+    focus_mastery = 0
+    focus_reason = "Essential foundation for your target role."
+
+    if gap_analysis.priority_gaps:
+        top_gap = gap_analysis.priority_gaps[0]
+        focus_topic_title = top_gap.topic_title
+        focus_skill_name = top_gap.skill_name
+        focus_domain = top_gap.domain
+        focus_mastery = top_gap.current_mastery
+        focus_reason = top_gap.reason
+    elif roadmap_overview.current_stage:
+        cs = roadmap_overview.current_stage
+        focus_domain = cs.title
+        focus_topic_title = cs.title
+        focus_skill_name = cs.skills[0] if cs.skills else cs.title
+        focus_mastery = cs.progress
+
+    focus = TodaysFocus(
+        domain=focus_domain,
+        skill=focus_skill_name,
+        skillId="f-1",
+        topic=focus_topic_title,
+        mastery=focus_mastery,
+        priority="HIGH" if focus_mastery < 40 else "MEDIUM",
+        estimatedMinutes=30,
+        reason=focus_reason,
+        blocksStage=current_stage_title,
     )
 
-    relevant_skills = [
-        RelevantSkillItem(
-            id=s["id"],
-            name=s["name"],
-            domain=s["domain"],
-            level=s["level"],
-            progress=s["progress"],
-            is_verified=s["is_verified"],
-        )
-        for s in active_skills
-    ]
+    # Convert active knowledge state topics to relevant_skills
+    relevant_skills = []
+    for t_id, st in list(knowledge_states.items())[:8]:
+        relevant_skills.append(RelevantSkillItem(
+            id=st.topic_id,
+            name=st.topic_title,
+            domain=st.domain,
+            level="Advanced" if st.mastery >= 85 else ("Proficient" if st.mastery >= 70 else ("Developing" if st.mastery >= 40 else "Novice")),
+            progress=st.mastery,
+            is_verified=st.evidence_count > 0 and st.mastery >= 75,
+        ))
 
     # Load active session and recent history
     active_sess_db = await get_active_session_from_db(user_id)
@@ -182,11 +204,11 @@ async def get_mentor_context(
 
     return LearnerContextResponse(
         user_id=user_id,
-        user_name=user.get("name", "Learner"),
+        user_name=user_name,
         target_role=target_role,
-        current_stage=current_stage["title"],
-        current_stage_order=current_stage["order"],
-        current_stage_progress=65,
+        current_stage=current_stage_title,
+        current_stage_order=roadmap_overview.current_stage.id if roadmap_overview.current_stage else 1,
+        current_stage_progress=roadmap_overview.current_stage.progress if roadmap_overview.current_stage else 0,
         overall_mastery=overall_progress,
         focus=focus,
         relevant_skills=relevant_skills,
@@ -215,7 +237,29 @@ async def get_todays_focus(
     target_role = "AI/ML Engineer"
     if user_profile and user_profile.get("profile_metadata"):
         meta = user_profile["profile_metadata"]
-        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        target_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or meta.get("role") or target_role
+
+    # 1. Ground focus directly in priority gap analysis for target role
+    try:
+        from app.services.gap_analysis_service import analyze_learner_gaps
+        gaps_data = await analyze_learner_gaps(user["id"], target_role)
+        if gaps_data.priority_gaps:
+            top_gap = gaps_data.priority_gaps[0]
+            priority_tag = "high" if top_gap.is_blocking or top_gap.priority_score >= 70 else ("medium" if top_gap.priority_score >= 40 else "low")
+            return TodaysFocus(
+                domain=top_gap.domain,
+                skill=top_gap.skill_name,
+                skill_id=top_gap.topic_id,
+                topic=top_gap.topic_title,
+                mastery=top_gap.current_mastery,
+                priority=priority_tag,
+                estimated_minutes=round(top_gap.estimated_hours_to_close * 30),
+                reason=top_gap.reason,
+                prerequisites=[],
+                blocks_stage=gaps_data.critical_blocker or "Next Roadmap Milestone",
+            )
+    except Exception as e:
+        logger.warning("Could not compute focus from gap analysis, using fallback: %s", e)
 
     topic_progress = await get_user_topic_progress_from_db(user["id"])
     topic_override_map = {t["skill_id"]: t["mastery"] for t in topic_progress}

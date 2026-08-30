@@ -67,18 +67,19 @@ async def _get_auth_user(authorization: Optional[str]) -> dict:
     summary="Get full learner roadmap and metrics",
 )
 async def get_roadmap(
+    role: Optional[str] = None,
     authorization: Optional[str] = Header(None),
 ) -> RoadmapOverviewResponse:
     """Returns the authenticated learner's complete curriculum roadmap with dynamic statuses."""
     user = await _get_auth_user(authorization)
     user_id = user["id"]
 
-    # Load target role from profile metadata
+    # Load target role from query param or profile metadata
     user_profile = await get_user_profile_from_db(user_id)
-    target_role = "AI/ML Engineer"
+    target_role = role or "Data Scientist"
     if user_profile and user_profile.get("profile_metadata"):
         meta = user_profile["profile_metadata"]
-        target_role = meta.get("target_role") or meta.get("career_goal") or target_role
+        target_role = role or meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or target_role
 
     return await get_roadmap_overview(
         user_id=user_id,
@@ -107,7 +108,7 @@ async def get_stage(
     target_role = "AI/ML Engineer"
     if user_profile and user_profile.get("profile_metadata"):
         meta = user_profile["profile_metadata"]
-        target_role = meta.get("target_role") or meta.get("career_goal") or target_role
+        target_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or target_role
 
     stage_detail = await get_stage_details(user_id, stage_id, target_role)
     if not stage_detail:
