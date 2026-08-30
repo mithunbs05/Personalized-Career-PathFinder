@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import onboarding, profile, mentor
+from app.routers import onboarding, profile, mentor, roadmap
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 # Application
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="PathAI Onboarding & AI Mentor API",
+    title="PathAI Onboarding, Roadmap & AI Mentor API",
     description=(
-        "AI-powered conversational onboarding and adaptive AI Mentor service using LangChain + GPT-4.1-nano."
+        "AI-powered conversational onboarding, adaptive Curriculum Roadmap Timeline, and AI Mentor service using LangChain + GPT-4.1-nano."
     ),
     version="1.0.0",
     docs_url="/docs",
@@ -58,6 +58,7 @@ app.add_middleware(
 app.include_router(onboarding.router)
 app.include_router(profile.router)
 app.include_router(mentor.router)
+app.include_router(roadmap.router)
 
 
 # ---------------------------------------------------------------------------

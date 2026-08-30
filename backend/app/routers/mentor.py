@@ -27,6 +27,7 @@ from app.models.mentor import (
     TodaysFocus,
     MentorSessionCreateRequest,
     MentorSessionResponse,
+    SessionDetailsResponse,
     SendMessageRequest,
     SendMessageResponse,
     PracticeResponse,
@@ -51,6 +52,10 @@ from app.services.mentor_service import (
     save_assessment_to_db,
     update_topic_progress_in_db,
     get_user_topic_progress_from_db,
+    get_active_session_from_db,
+    get_session_messages_from_db,
+    get_recent_assessments_from_db,
+    get_user_profile_from_db,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,9 +94,16 @@ async def _get_auth_user(authorization: Optional[str]) -> dict[str, Any]:
 async def get_mentor_context(
     authorization: Optional[str] = Header(None),
 ) -> LearnerContextResponse:
-    """Returns real-time learner profile, current stage, skills, and Today's Focus."""
+    """Returns real-time learner profile, current stage, skills, Today's Focus, and active session."""
     user = await _get_auth_user(authorization)
     user_id = user["id"]
+
+    # Load user profile from DB if available
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "AI/ML Engineer"
+    if user_profile and user_profile.get("profile_metadata"):
+        meta = user_profile["profile_metadata"]
+        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
 
     # Load topic progress from DB
     topic_progress = await get_user_topic_progress_from_db(user_id)
@@ -114,7 +126,7 @@ async def get_mentor_context(
         stages=CANONICAL_STAGES,
         user_skills=active_skills,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
         topic_progress=topic_progress,
     )
 
@@ -130,18 +142,60 @@ async def get_mentor_context(
         for s in active_skills
     ]
 
+    # Load active session and recent history
+    active_sess_db = await get_active_session_from_db(user_id)
+    active_sess_id = active_sess_db["id"] if active_sess_db else None
+    
+    # Also check in-memory store for active session
+    if not active_sess_id:
+        for sid, sdata in reversed(list(_SESSION_STORE.items())):
+            if sdata.get("user_id") == user_id and sdata.get("status") == "active":
+                active_sess_id = sid
+                active_sess_db = sdata
+                break
+
+    recent_messages = []
+    if active_sess_id:
+        db_msgs = await get_session_messages_from_db(active_sess_id, limit=20)
+        if db_msgs:
+            recent_messages = [
+                {
+                    "id": m.get("id"),
+                    "sender": "user" if m.get("role") == "user" else "ai",
+                    "text": m.get("content", ""),
+                    "timestamp": m.get("created_at", ""),
+                }
+                for m in db_msgs
+            ]
+        elif active_sess_id in _SESSION_STORE:
+            recent_messages = [
+                {
+                    "id": f"msg-{i}",
+                    "sender": "user" if h["role"] == "user" else "ai",
+                    "text": h["content"],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                for i, h in enumerate(_SESSION_STORE[active_sess_id].get("history", []))
+            ]
+
+    recent_assessments = await get_recent_assessments_from_db(user_id, limit=5)
+
     return LearnerContextResponse(
         user_id=user_id,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
         current_stage=current_stage["title"],
         current_stage_order=current_stage["order"],
         current_stage_progress=65,
         overall_mastery=overall_progress,
         focus=focus,
         relevant_skills=relevant_skills,
-        recent_assessments=[],
+        recent_assessments=recent_assessments,
+        active_session_id=active_sess_id,
+        active_session=active_sess_db,
+        recent_messages=recent_messages,
     )
+
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +211,12 @@ async def get_todays_focus(
 ) -> TodaysFocus:
     """Returns the highest priority learning focus for today."""
     user = await _get_auth_user(authorization)
+    user_profile = await get_user_profile_from_db(user["id"])
+    target_role = "AI/ML Engineer"
+    if user_profile and user_profile.get("profile_metadata"):
+        meta = user_profile["profile_metadata"]
+        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+
     topic_progress = await get_user_topic_progress_from_db(user["id"])
     topic_override_map = {t["skill_id"]: t["mastery"] for t in topic_progress}
 
@@ -169,7 +229,7 @@ async def get_todays_focus(
         stages=CANONICAL_STAGES,
         user_skills=active_skills,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
         topic_progress=topic_progress,
     )
 
@@ -191,9 +251,19 @@ async def create_mentor_session(
     user_id = user["id"]
 
     topic_progress = await get_user_topic_progress_from_db(user_id)
+    topic_override_map = {t["skill_id"]: t["mastery"] for t in topic_progress}
+    for t in topic_progress:
+        if t.get("skill_name"):
+            topic_override_map[t["skill_name"]] = t["mastery"]
+
+    active_skills = [
+        {**s, "progress": topic_override_map.get(s["id"], topic_override_map.get(s["name"], s["progress"]))}
+        for s in CANONICAL_SKILLS
+    ]
+
     focus = calculate_todays_focus(
         stages=CANONICAL_STAGES,
-        user_skills=CANONICAL_SKILLS,
+        user_skills=active_skills,
         user_name=user.get("name", "Learner"),
         target_role="AI/ML Engineer",
         topic_progress=topic_progress,
@@ -255,6 +325,87 @@ async def create_mentor_session(
         started_at="now",
         status="active",
         opening_message=opening_msg,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 3.1 GET /api/v1/mentor/sessions/{session_id}
+# ---------------------------------------------------------------------------
+@router.get(
+    "/sessions/{session_id}",
+    response_model=SessionDetailsResponse,
+    summary="Get session details and message history",
+)
+async def get_mentor_session(
+    session_id: str,
+    authorization: Optional[str] = Header(None),
+) -> SessionDetailsResponse:
+    """Retrieves session status and recent conversation history."""
+    user = await _get_auth_user(authorization)
+    user_id = user["id"]
+
+    session_data = _SESSION_STORE.get(session_id)
+    messages = []
+
+    db_messages = await get_session_messages_from_db(session_id)
+    if db_messages:
+        messages = [
+            {
+                "id": m.get("id"),
+                "sender": "user" if m.get("role") == "user" else "ai",
+                "text": m.get("content", ""),
+                "timestamp": m.get("created_at", ""),
+            }
+            for m in db_messages
+        ]
+    elif session_data and "history" in session_data:
+        messages = [
+            {
+                "id": f"msg-{i}",
+                "sender": "user" if h["role"] == "user" else "ai",
+                "text": h["content"],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            for i, h in enumerate(session_data["history"])
+        ]
+
+    if not session_data:
+        focus = calculate_todays_focus(
+            stages=CANONICAL_STAGES,
+            user_skills=CANONICAL_SKILLS,
+            user_name=user.get("name", "Learner"),
+            target_role="AI/ML Engineer",
+        )
+        session_resp = MentorSessionResponse(
+            id=session_id,
+            user_id=user_id,
+            domain=focus.domain,
+            skill=focus.skill,
+            skill_id=focus.skill_id,
+            topic=focus.topic,
+            roadmap_stage="Mathematics & Statistics",
+            mode="learn",
+            started_at=datetime.now(timezone.utc).isoformat(),
+            status="active",
+        )
+    else:
+        session_resp = MentorSessionResponse(
+            id=session_id,
+            user_id=session_data.get("user_id", user_id),
+            domain=session_data.get("domain", "Math & Statistics"),
+            skill=session_data.get("skill", "Linear Algebra"),
+            skill_id=session_data.get("skill_id", "s4"),
+            topic=session_data.get("topic"),
+            roadmap_stage=session_data.get("roadmap_stage", "Mathematics & Statistics"),
+            mode=session_data.get("mode", "learn"),
+            started_at=session_data.get("started_at", datetime.now(timezone.utc).isoformat()),
+            status=session_data.get("status", "active"),
+            opening_message=session_data.get("opening_message"),
+        )
+
+    return SessionDetailsResponse(
+        session=session_resp,
+        messages=messages,
     )
 
 
@@ -467,6 +618,12 @@ async def submit_assessment(
     )
 
     # 4. Recalculate Today's Focus dynamically with the new mastery!
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "AI/ML Engineer"
+    if user_profile and user_profile.get("profile_metadata"):
+        meta = user_profile["profile_metadata"]
+        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+
     updated_skills = [
         {**s, "progress": new_mastery if s["id"] == focus.skill_id else s["progress"]}
         for s in CANONICAL_SKILLS
@@ -476,7 +633,7 @@ async def submit_assessment(
         stages=CANONICAL_STAGES,
         user_skills=updated_skills,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
     )
 
     return AssessmentSubmitResponse(

@@ -1,188 +1,163 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LogOut, Flame, Clock, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { RoadmapStage } from '../types/roadmap';
 import { RoadmapCanvas } from '../components/roadmap/RoadmapCanvas';
-import { CourseMaterialsDrawer } from '../components/roadmap/CourseMaterialsDrawer';
+import { StageDetailsPanel } from '../components/roadmap/StageDetailsPanel';
 import SkillMatrix from '../components/roadmap/SkillMatrix';
 import { AIMentorPage } from '../components/mentor/AIMentorPage';
 import { MultiModalTransformer } from '../components/transformer/MultiModalTransformer';
+import {
+  roadmapService,
+  RoadmapOverviewResponse,
+  RoadmapStageDetail,
+  RoadmapStageSummary,
+} from '../services/roadmap.service';
 
-// Mock Data Structured for API Integration
-const MOCK_STAGES: RoadmapStage[] = [
-  {
-    id: 1,
-    title: "Programming Foundations",
-    status: "COMPLETED",
-    difficulty: "Beginner",
-    estimatedDuration: "2 Weeks",
-    whyLearn: "Understanding core programming logic, variables, and control structures is essential before diving into AI-specific languages.",
-    prerequisites: [],
-    skills: ["Data Types", "Loops", "Functions"],
-    learnings: ["Understand variables and data types", "Master control flow (if/else, loops)", "Write basic functions"],
-    resources: [
-      { id: "r1", title: "CS50 Introduction to Computer Science", type: "COURSE", provider: "Harvard / edX", duration: "12 hours", url: "#" },
-      { id: "r2", title: "Basic Logic Practice", type: "PRACTICE", provider: "LeetCode", duration: "2 hours", url: "#" }
-    ],
-    project: "Build a simple calculator",
-    assessment: "a1"
-  },
-  {
-    id: 2,
-    title: "Python for AI",
-    status: "COMPLETED",
-    difficulty: "Beginner",
-    estimatedDuration: "3 Weeks",
-    whyLearn: "Python is the lingua franca of AI and Machine Learning. You need to master its syntax, data structures, and standard libraries.",
-    prerequisites: ["Programming Foundations"],
-    skills: ["Lists", "Dictionaries", "OOP"],
-    learnings: ["Master Python data structures", "Understand Object-Oriented Programming in Python", "File I/O operations"],
-    resources: [
-      { id: "r3", title: "Python for Everybody", type: "COURSE", provider: "Coursera", duration: "10 hours", url: "#" },
-      { id: "r4", title: "Official Python Docs", type: "DOCUMENTATION", provider: "Python.org", duration: "Readings", url: "#" }
-    ],
-    project: "Data parser script",
-    assessment: "a2"
-  },
-  {
-    id: 3,
-    title: "Mathematics & Statistics",
-    status: "IN_PROGRESS",
-    difficulty: "Intermediate",
-    estimatedDuration: "4 Weeks",
-    whyLearn: "Linear algebra, calculus, and probability form the theoretical foundation for how machine learning algorithms actually optimize and learn.",
-    prerequisites: ["Python for AI"],
-    skills: ["Linear Algebra", "Calculus", "Probability"],
-    learnings: ["Understand matrix operations", "Grasp derivatives and gradients", "Learn probability distributions"],
-    resources: [
-      { id: "r5", title: "Mathematics for Machine Learning", type: "COURSE", provider: "Imperial College", duration: "15 hours", url: "#" },
-      { id: "r6", title: "Essence of Linear Algebra", type: "VIDEO", provider: "3Blue1Brown", duration: "4 hours", url: "#" }
-    ],
-    project: "Statistical analysis of a dataset",
-    assessment: "a3"
-  },
-  {
-    id: 4,
-    title: "Machine Learning",
-    status: "NOT_STARTED",
-    difficulty: "Intermediate",
-    estimatedDuration: "4 Weeks",
-    whyLearn: "Learn the classic algorithms (trees, SVMs, clustering) before moving to deep learning to understand feature engineering and evaluation.",
-    prerequisites: ["Mathematics & Statistics"],
-    skills: ["Scikit-Learn", "Regression", "Classification"],
-    learnings: ["Train regression models", "Implement random forests", "Evaluate model metrics (F1, Precision, Recall)"],
-    resources: [
-      { id: "r7", title: "Machine Learning Specialization", type: "COURSE", provider: "DeepLearning.AI", duration: "20 hours", url: "#" }
-    ],
-    project: "Predictive model for housing prices",
-    assessment: "a4"
-  },
-  {
-    id: 5,
-    title: "Deep Learning",
-    status: "LOCKED",
-    difficulty: "Advanced",
-    estimatedDuration: "5 Weeks",
-    whyLearn: "Neural networks are the engines behind modern AI. Understanding backpropagation and layer architectures is crucial.",
-    prerequisites: ["Machine Learning"],
-    skills: ["PyTorch", "TensorFlow", "Neural Networks"],
-    learnings: ["Build multi-layer perceptrons", "Understand backpropagation", "Implement CNNs and RNNs"],
-    resources: [],
-    project: "Image classification model",
-    assessment: "a5"
-  },
-  {
-    id: 6,
-    title: "Natural Language Processing",
-    status: "LOCKED",
-    difficulty: "Advanced",
-    estimatedDuration: "3 Weeks",
-    whyLearn: "Text data is everywhere. NLP techniques allow you to process, tokenize, and extract meaning from human language.",
-    prerequisites: ["Deep Learning"],
-    skills: ["Tokenization", "Transformers", "Word Embeddings"],
-    learnings: ["Process text data", "Understand Word2Vec / GloVe", "Learn Transformer architecture basics"],
-    resources: [],
-    project: "Sentiment analysis pipeline",
-    assessment: "a6"
-  },
-  {
-    id: 7,
-    title: "Generative AI & LLMs",
-    status: "LOCKED",
-    difficulty: "Advanced",
-    estimatedDuration: "4 Weeks",
-    whyLearn: "Large Language Models represent the state-of-the-art. You must learn how to prompt, fine-tune, and utilize them.",
-    prerequisites: ["Natural Language Processing"],
-    skills: ["Prompt Engineering", "Fine-Tuning", "HuggingFace"],
-    learnings: ["Understand LLM architectures", "Implement PEFT/LoRA", "Use HuggingFace pipelines"],
-    resources: [],
-    project: "Fine-tune a small LLM",
-    assessment: "a7"
-  },
-  {
-    id: 8,
-    title: "RAG & AI Applications",
-    status: "LOCKED",
-    difficulty: "Advanced",
-    estimatedDuration: "3 Weeks",
-    whyLearn: "Retrieval-Augmented Generation is how you give LLMs external knowledge. This is highly demanded in enterprise AI.",
-    prerequisites: ["Generative AI & LLMs"],
-    skills: ["Vector DBs", "LangChain", "RAG"],
-    learnings: ["Set up Vector Databases (Pinecone, Chroma)", "Build RAG pipelines", "Use LangChain/LlamaIndex"],
-    resources: [],
-    project: "Build a document Q&A bot",
-    assessment: "a8"
-  },
-  {
-    id: 9,
-    title: "Deployment & MLOps",
-    status: "LOCKED",
-    difficulty: "Advanced",
-    estimatedDuration: "3 Weeks",
-    whyLearn: "A model is useless if it's not in production. Learn how to serve models as APIs and monitor them.",
-    prerequisites: ["RAG & AI Applications"],
-    skills: ["Docker", "FastAPI", "Model Serving"],
-    learnings: ["Containerize AI applications", "Create FastAPI endpoints for inference", "Understand CI/CD for ML"],
-    resources: [],
-    project: "Deploy an ML API to the cloud",
-    assessment: "a9"
-  },
-  {
-    id: 10,
-    title: "Enterprise Multi-Modal Document RAG System",
-    status: "LOCKED",
-    difficulty: "Expert",
-    estimatedDuration: "3-4 Weeks",
-    whyLearn: "This capstone consolidates all your knowledge into a production-grade, resume-ready enterprise application.",
-    prerequisites: ["Deployment & MLOps"],
-    skills: ["End-to-End System Design", "Production Deployment", "Full Stack AI"],
-    learnings: ["Architect a complex system", "Integrate vision and text models", "Deploy securely to production"],
-    resources: [],
-    project: "Build an Enterprise Multi-Modal Document RAG System with OCR, Vector Search, and a conversational UI.",
-    assessment: "capstone",
-    isFinalCapstone: true
-  }
+// Fallback baseline stages if initial load is pending
+const DEFAULT_STAGES: RoadmapStageSummary[] = [
+  { id: 1, title: 'Programming Foundations', status: 'COMPLETED', difficulty: 'Beginner', estimated_duration: '2 Weeks', progress: 100, is_final_capstone: false, skills: ['Python OOP', 'Data Types'] },
+  { id: 2, title: 'Python for AI', status: 'COMPLETED', difficulty: 'Beginner', estimated_duration: '3 Weeks', progress: 100, is_final_capstone: false, skills: ['NumPy & Pandas', 'Data Wrangling'] },
+  { id: 3, title: 'Mathematics & Statistics', status: 'IN_PROGRESS', difficulty: 'Intermediate', estimated_duration: '4 Weeks', progress: 45, is_final_capstone: false, skills: ['Linear Algebra', 'Calculus', 'Probability', 'Optimization'] },
+  { id: 4, title: 'Machine Learning', status: 'AVAILABLE', difficulty: 'Intermediate', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['Scikit-Learn', 'Regression', 'Random Forests'] },
+  { id: 5, title: 'Deep Learning', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '5 Weeks', progress: 0, is_final_capstone: false, skills: ['PyTorch', 'Neural Nets'] },
+  { id: 6, title: 'Natural Language Processing', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '3 Weeks', progress: 0, is_final_capstone: false, skills: ['Transformers', 'Tokenization'] },
+  { id: 7, title: 'Generative AI & LLMs', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['Fine-Tuning (LoRA)', 'Prompt Engineering'] },
+  { id: 8, title: 'RAG & AI Applications', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['RAG', 'Vector DBs'] },
+  { id: 9, title: 'Deployment & MLOps', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: false, skills: ['FastAPI & Docker', 'CI/CD'] },
+  { id: 10, title: 'Final AI Engineering Capstone', status: 'LOCKED', difficulty: 'Advanced', estimated_duration: '4 Weeks', progress: 0, is_final_capstone: true, skills: ['End-to-End System Design'] },
 ];
 
 export const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [stages] = useState<RoadmapStage[]>(MOCK_STAGES);
-  const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'roadmap' | 'skills' | 'mentor' | 'practice'>('roadmap');
+  const [overview, setOverview] = useState<RoadmapOverviewResponse | null>(null);
 
-  const selectedStage = useMemo(() => {
-    return stages.find((s) => s.id === selectedStageId) || null;
-  }, [selectedStageId, stages]);
+  // Persist selected tab across page reloads
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'skills' | 'mentor' | 'practice'>(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (['roadmap', 'skills', 'mentor', 'practice'].includes(hash)) {
+      return hash as any;
+    }
+    const saved = localStorage.getItem('pathai_active_tab');
+    if (saved && ['roadmap', 'skills', 'mentor', 'practice'].includes(saved)) {
+      return saved as any;
+    }
+    return 'roadmap';
+  });
 
-  // Calculate progress
-  const completedStages = stages.filter((s) => s.status === 'COMPLETED').length;
-  const progressPercentage = Math.round((completedStages / stages.length) * 100);
+  // Persist selected stage across page reloads
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('pathai_selected_stage_id');
+    return saved ? Number(saved) : null;
+  });
+
+  // Persist dark mode
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('pathai_dark_mode') === 'true';
+  });
+
+  const [stageDetail, setStageDetail] = useState<RoadmapStageDetail | null>(null);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(true);
+  const [isLoadingStage, setIsLoadingStage] = useState(false);
+
+  // Sync activeTab to localStorage and URL hash
+  useEffect(() => {
+    localStorage.setItem('pathai_active_tab', activeTab);
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
+  // Sync selectedStageId to localStorage
+  useEffect(() => {
+    if (selectedStageId !== null) {
+      localStorage.setItem('pathai_selected_stage_id', String(selectedStageId));
+    } else {
+      localStorage.removeItem('pathai_selected_stage_id');
+    }
+  }, [selectedStageId]);
+
+  // Sync isDarkMode to localStorage
+  useEffect(() => {
+    localStorage.setItem('pathai_dark_mode', String(isDarkMode));
+  }, [isDarkMode]);
+
+  // Load Roadmap Overview from Backend
+  const loadRoadmap = useCallback(async () => {
+    try {
+      setIsLoadingOverview(true);
+      const data = await roadmapService.getRoadmap();
+      setOverview(data);
+    } catch (err) {
+      console.warn('Failed to load roadmap from backend, using fallback:', err);
+    } finally {
+      setIsLoadingOverview(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRoadmap();
+  }, [loadRoadmap]);
+
+  // Load Selected Stage Details from Backend
+  useEffect(() => {
+    if (!selectedStageId) {
+      setStageDetail(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchStage = async () => {
+      try {
+        setIsLoadingStage(true);
+        const detail = await roadmapService.getStageDetails(selectedStageId);
+        if (isMounted) {
+          setStageDetail(detail);
+        }
+      } catch (err) {
+        console.error('Failed to load stage detail:', err);
+      } finally {
+        if (isMounted) setIsLoadingStage(false);
+      }
+    };
+
+    fetchStage();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStageId]);
+
+  // Handler for starting a stage
+  const handleStartStage = async (stageId: number) => {
+    try {
+      await roadmapService.startStage(stageId);
+      // Reload roadmap and active stage details to update statuses
+      await loadRoadmap();
+      const updated = await roadmapService.getStageDetails(stageId);
+      setStageDetail(updated);
+    } catch (err) {
+      console.error('Failed to start stage:', err);
+    }
+  };
+
+  // Cross-system navigation to AI Mentor with contextual state
+  const handleNavigateToMentor = (context: {
+    stageTitle: string;
+    skillName: string;
+    topicTitle?: string;
+    mastery: number;
+  }) => {
+    setActiveTab('mentor');
+  };
+
+  // Cross-system navigation to Skill Matrix
+  const handleNavigateToSkills = (_skillName?: string) => {
+    setActiveTab('skills');
+  };
+
+  const stagesList = overview?.stages || DEFAULT_STAGES;
+  const progressPercentage = overview?.overall_progress || 20;
 
   return (
     <div className={isDarkMode ? 'dark-mode-active' : ''}>
       <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-
         {/* Top Navigation Bar */}
         <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -194,7 +169,7 @@ export const Dashboard: React.FC = () => {
                 Path<span className="text-[#ff4726]">AI</span>
               </span>
               <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-full text-[10px] font-extrabold tracking-wider text-slate-600 dark:text-slate-300 uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> AI/ML ENGINEER
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {overview?.target_role || 'AI/ML ENGINEER'}
               </div>
             </div>
 
@@ -209,10 +184,11 @@ export const Dashboard: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${activeTab === tab.id
+                  className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
+                    activeTab === tab.id
                       ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-white shadow-sm font-bold'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
+                  }`}
                 >
                   {tab.label}
                 </button>
@@ -242,17 +218,17 @@ export const Dashboard: React.FC = () => {
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {activeTab === 'roadmap' ? (
             <div className="space-y-6">
-              {/* Learner Cockpit Metrics (Only visible on Roadmap Timeline) */}
+              {/* Learner Cockpit Metrics */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold tracking-widest text-slate-600 dark:text-slate-300 uppercase mb-3">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span> Learner Cockpit
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                    Welcome back, {user?.name || 'Giri'}!
+                    Welcome back, {user?.name || overview?.user_name || 'Learner'}!
                   </h1>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">
-                    Target Role: <strong className="text-slate-900 dark:text-white">AI/ML Engineer</strong> • Target Pace: <strong className="text-slate-900 dark:text-white">15 hrs/week</strong> • Duration: <strong className="text-slate-900 dark:text-white">6–9 months</strong>
+                    Target Role: <strong className="text-slate-900 dark:text-white">{overview?.target_role || 'AI/ML Engineer'}</strong> • Target Pace: <strong className="text-slate-900 dark:text-white">15 hrs/week</strong> • Remaining: <strong className="text-slate-900 dark:text-white">~{overview?.estimated_remaining_weeks || 18} weeks</strong>
                   </p>
                 </div>
 
@@ -303,6 +279,7 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Main Content Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Main Canvas Column */}
                 <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col">
@@ -311,32 +288,50 @@ export const Dashboard: React.FC = () => {
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white">Adaptive Curriculum Timeline</h2>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Interactive node graph of your prerequisite dependencies</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Completed</span>
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="w-2 h-2 rounded-full bg-[#ea580c] animate-pulse"></span> In Progress</span>
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></span> Locked</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Completed
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <span className="w-2 h-2 rounded-full bg-[#ea580c] animate-pulse"></span> In Progress
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span> Ready to Start
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <span className="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></span> Locked
+                      </span>
                     </div>
                   </div>
 
                   {/* React Flow Canvas Component */}
                   <RoadmapCanvas
-                    stages={stages}
+                    stages={stagesList}
                     selectedStageId={selectedStageId}
-                    onSelectStage={setSelectedStageId}
+                    onSelectStage={(id) => setSelectedStageId(id)}
                     isDarkMode={isDarkMode}
                   />
                 </div>
 
-                {/* Right Sticky Column */}
+                {/* Right Sticky Column — Enhanced Stage Details & Overview */}
                 <div className="lg:col-span-4 relative">
-                  <CourseMaterialsDrawer stage={selectedStage} />
+                  <StageDetailsPanel
+                    stage={stageDetail}
+                    overview={overview}
+                    isLoading={isLoadingStage}
+                    onSelectStage={(id) => setSelectedStageId(id)}
+                    onStartStage={handleStartStage}
+                    onNavigateToMentor={handleNavigateToMentor}
+                    onNavigateToSkills={handleNavigateToSkills}
+                    onCloseSelection={() => setSelectedStageId(null)}
+                  />
                 </div>
               </div>
             </div>
           ) : activeTab === 'skills' ? (
             <SkillMatrix />
           ) : activeTab === 'mentor' ? (
-            <AIMentorPage stages={stages} user={user} onNavigate={setActiveTab} />
+            <AIMentorPage stages={stagesList as any} user={user} onNavigate={setActiveTab} />
           ) : activeTab === 'practice' ? (
             <MultiModalTransformer />
           ) : null}

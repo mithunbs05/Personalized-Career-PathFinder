@@ -1,3 +1,4 @@
+const FASTAPI_BASE = import.meta.env.DEV ? 'http://localhost:8000/api/v1' : '/api/v1';
 const API_BASE = '/api';
 
 export class ApiError extends Error {
@@ -16,7 +17,21 @@ export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('pathai_access_token');
+  let token = localStorage.getItem('pathai_access_token');
+  if (!token) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(key) || '{}');
+          if (parsed.access_token) {
+            token = parsed.access_token;
+            break;
+          }
+        } catch {}
+      }
+    }
+  }
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -27,7 +42,27 @@ export async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  let url: string;
+  if (endpoint.startsWith('http')) {
+    url = endpoint;
+  } else if (
+    endpoint.startsWith('/mentor') ||
+    endpoint.startsWith('mentor') ||
+    endpoint.startsWith('/assessments') ||
+    endpoint.startsWith('assessments') ||
+    endpoint.startsWith('/roadmap') ||
+    endpoint.startsWith('roadmap')
+  ) {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    // If endpoint starts with /assessments, ensure prefix /mentor/assessments
+    const routedEndpoint = cleanEndpoint.startsWith('/assessments')
+      ? `/mentor${cleanEndpoint}`
+      : cleanEndpoint;
+    url = `${FASTAPI_BASE}${routedEndpoint}`;
+  } else {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    url = cleanEndpoint.startsWith('/api') ? cleanEndpoint : `${API_BASE}${cleanEndpoint}`;
+  }
 
   let response = await fetch(url, {
     ...options,

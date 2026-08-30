@@ -10,11 +10,11 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { RoadmapStage } from '../../types/roadmap';
-import CustomNode from './CustomNode';
+import CustomNode, { CustomStageStatus } from './CustomNode';
+import { RoadmapStageSummary } from '../../services/roadmap.service';
 
 interface RoadmapCanvasProps {
-  stages: RoadmapStage[];
+  stages: RoadmapStageSummary[] | any[];
   selectedStageId: number | null;
   onSelectStage: (id: number) => void;
   isDarkMode?: boolean;
@@ -37,11 +37,17 @@ const getCoordinates = (index: number) => {
   return { x, y };
 };
 
-export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({ stages, selectedStageId, onSelectStage, isDarkMode = false }) => {
+export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({
+  stages,
+  selectedStageId,
+  onSelectStage,
+  isDarkMode = false,
+}) => {
   const initialNodes: Node[] = useMemo(() => {
     return stages.map((stage, index) => {
       const isFinalCapstone = index === stages.length - 1;
-      
+      const status: CustomStageStatus = (stage.status as CustomStageStatus) || 'LOCKED';
+
       return {
         id: stage.id.toString(),
         type: 'custom',
@@ -49,10 +55,10 @@ export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({ stages, selectedSt
         data: {
           title: stage.title,
           stageId: stage.id,
-          status: stage.status,
-          difficulty: stage.difficulty,
-          duration: stage.estimatedDuration,
-          isFinalCapstone,
+          status,
+          difficulty: stage.difficulty || 'Intermediate',
+          duration: stage.estimated_duration || stage.estimatedDuration || '4 Weeks',
+          isFinalCapstone: isFinalCapstone || stage.is_final_capstone,
         },
       };
     });
@@ -64,20 +70,28 @@ export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({ stages, selectedSt
       const currentStatus = stages[i].status;
       const nextStatus = stages[i + 1].status;
       
-      // Determine if edge should be "active" (current node is completed, or in progress)
-      const isCompletedOrActive = currentStatus === 'COMPLETED' || currentStatus === 'IN_PROGRESS';
+      const isCompleted = currentStatus === 'COMPLETED';
       const isNextActive = nextStatus === 'IN_PROGRESS';
+      const isSelectedPath = selectedStageId === stages[i + 1].id;
       
-      const isAnimated = isCompletedOrActive && isNextActive;
-      const strokeColor = isCompletedOrActive ? '#ea580c' : '#e2e8f0'; // Orange for active path, slate-200 for inactive
-      
+      const isAnimated = isCompleted && isNextActive;
+      const strokeColor = isSelectedPath
+        ? '#ea580c'
+        : isCompleted
+        ? '#10b981'
+        : isNextActive
+        ? '#ea580c'
+        : isDarkMode ? '#334155' : '#e2e8f0';
+
+      const strokeWidth = isSelectedPath ? 3 : isCompleted || isNextActive ? 2 : 1.5;
+
       edges.push({
         id: `e${stages[i].id}-${stages[i + 1].id}`,
         source: stages[i].id.toString(),
         target: stages[i + 1].id.toString(),
         type: 'smoothstep',
         animated: isAnimated,
-        style: { stroke: strokeColor, strokeWidth: 2 },
+        style: { stroke: strokeColor, strokeWidth },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: strokeColor,
@@ -85,20 +99,23 @@ export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({ stages, selectedSt
       });
     }
     return edges;
-  }, [stages]);
+  }, [stages, selectedStageId, isDarkMode]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update selected state of nodes when selectedStageId changes
+  // Sync nodes when stages or selection change
   useEffect(() => {
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        selected: n.id === selectedStageId?.toString(),
-      }))
-    );
-  }, [selectedStageId, setNodes]);
+    setNodes(initialNodes.map((n) => ({
+      ...n,
+      selected: n.id === selectedStageId?.toString(),
+    })));
+  }, [initialNodes, selectedStageId, setNodes]);
+
+  // Sync edges when selection or stages change
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -129,3 +146,4 @@ export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({ stages, selectedSt
     </div>
   );
 };
+

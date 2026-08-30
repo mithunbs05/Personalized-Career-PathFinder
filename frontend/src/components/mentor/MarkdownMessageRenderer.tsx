@@ -168,13 +168,16 @@ export function formatMathToUnicode(mathStr: string): string {
 // ---------------------------------------------------------------------------
 
 function renderInlineFormattedText(text: string): React.ReactNode[] {
+  // Strip any accidental leading hashtags from inline text
+  const cleanInput = text.replace(/^#{1,6}\s*/, '');
+
   // Regex to split on:
   // 1. Explicit LaTeX inline math: \( ... \) or $ ... $ (excluding simple money values like $10)
   // 2. Code snippets: `code`
   // 3. Bold: **bold**
   // 4. Italic: *italic*
   const tokenRegex = /(\\\([\s\S]*?\\\)|(?:\$(?!\d+(?:\.\d+)?(?:\s|$))[^$\n]+\$)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
-  const tokens = text.split(tokenRegex);
+  const tokens = cleanInput.split(tokenRegex);
 
   return tokens.map((token, idx) => {
     if (!token) return null;
@@ -223,8 +226,9 @@ function renderInlineFormattedText(text: string): React.ReactNode[] {
       return <em key={idx} className="italic text-slate-700 dark:text-slate-300">{token.slice(1, -1)}</em>;
     }
 
-    // Plain text
-    return <span key={idx}>{token}</span>;
+    // Plain text (strip any embedded hashtags)
+    const cleanedText = token.replace(/#{1,6}\s*/g, '');
+    return <span key={idx}>{cleanedText}</span>;
   });
 }
 
@@ -319,6 +323,32 @@ function renderTextParagraphs(rawText: string): React.ReactNode[] {
       <div key={pIdx} className="space-y-1">
         {lines.map((line, lIdx) => {
           const trimmed = line.trim();
+
+          // Markdown Headers (#, ##, ###, ####, etc.) -> Clean HTML Headings
+          const headerMatch = trimmed.match(/^(#{1,6})\s*(.*)$/);
+          if (headerMatch) {
+            const level = headerMatch[1].length;
+            const headerContent = headerMatch[2];
+            if (level === 1) {
+              return (
+                <h2 key={lIdx} className="text-lg font-black text-slate-900 dark:text-white mt-3 mb-1.5 flex items-center gap-2">
+                  {renderInlineFormattedText(headerContent)}
+                </h2>
+              );
+            }
+            if (level === 2) {
+              return (
+                <h3 key={lIdx} className="text-base font-extrabold text-slate-900 dark:text-white mt-2.5 mb-1 flex items-center gap-2">
+                  {renderInlineFormattedText(headerContent)}
+                </h3>
+              );
+            }
+            return (
+              <h4 key={lIdx} className="text-sm font-bold text-slate-900 dark:text-white mt-2 mb-1 flex items-center gap-2">
+                {renderInlineFormattedText(headerContent)}
+              </h4>
+            );
+          }
 
           // Bullet points (•, -, *)
           if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || (trimmed.startsWith('* ') && !trimmed.startsWith('** '))) {
