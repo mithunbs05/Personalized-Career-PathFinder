@@ -37,6 +37,7 @@ import {
   CreateAssessmentPayload,
 } from '../../services/mentor.service';
 import { MarkdownMessageRenderer } from './MarkdownMessageRenderer';
+import { RoadmapOverviewResponse } from '../../services/roadmap.service';
 import { cn } from '../../lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -46,6 +47,17 @@ import { cn } from '../../lib/utils';
 interface AIMentorPageProps {
   stages: RoadmapStage[];
   user: User | null;
+  overview?: RoadmapOverviewResponse | null;
+  initialContext?: {
+    stageTitle?: string;
+    stageId?: number;
+    skillName?: string;
+    skillFocus?: string;
+    topicTitle?: string;
+    mastery?: number;
+    mode?: 'learn' | 'practice' | 'assess';
+    reason?: string;
+  } | null;
   onNavigate: (tab: 'roadmap' | 'skills' | 'mentor' | 'practice') => void;
 }
 
@@ -78,9 +90,16 @@ function getQuickActionIcon(icon: string) {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavigate }) => {
+export const AIMentorPage: React.FC<AIMentorPageProps> = ({
+  stages,
+  user,
+  overview,
+  initialContext,
+  onNavigate,
+}) => {
   // Persistent State across reloads
   const [mode, setMode] = useState<MentorMode>(() => {
+    if (initialContext?.mode) return initialContext.mode;
     const saved = localStorage.getItem('pathai_mentor_mode');
     return (saved === 'learn' || saved === 'practice' || saved === 'assess') ? saved : 'learn';
   });
@@ -176,6 +195,36 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
     }
   }, [messages]);
 
+  // Handle cross-system contextual navigation from Roadmap or Skill Matrix
+  useEffect(() => {
+    if (initialContext) {
+      if (initialContext.mode) {
+        setMode(initialContext.mode);
+      }
+      if (initialContext.topicTitle) {
+        setServerFocus({
+          domain: initialContext.stageTitle || 'Current Learning Stage',
+          skill: initialContext.skillName || initialContext.topicTitle,
+          skillId: String(initialContext.stageId || 's1'),
+          topic: initialContext.topicTitle,
+          mastery: initialContext.mastery ?? 20,
+          priority: 'HIGH',
+          estimatedMinutes: 30,
+          reason: initialContext.reason || `Targeting key topic '${initialContext.topicTitle}' to advance your roadmap progress.`,
+          blocksStage: initialContext.stageTitle || null,
+        });
+
+        const actionText = initialContext.mode === 'practice'
+          ? `Let's practice core problems on "${initialContext.topicTitle}".`
+          : initialContext.mode === 'assess'
+          ? `I want to take a diagnostic assessment on "${initialContext.topicTitle}".`
+          : `Can you explain the key concepts and intuition behind "${initialContext.topicTitle}"?`;
+
+        setInputValue(actionText);
+      }
+    }
+  }, [initialContext]);
+
   useEffect(() => {
     localStorage.setItem('pathai_mentor_session_active', String(sessionActive));
   }, [sessionActive]);
@@ -215,20 +264,26 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
   }, [skillOverrides]);
 
   // Derived user / role context
-  const effectiveTargetRole = serverContext?.target_role || 'AI/ML Engineer';
-  const effectiveUserName = serverContext?.user_name || user?.name || 'Learner';
+  const effectiveTargetRole = overview?.target_role || user?.profile?.targetGoal || serverContext?.target_role || 'AI/ML Engineer';
+  const effectiveUserName = user?.name || overview?.user_name || serverContext?.user_name || 'Learner';
 
   const currentStage = useMemo(() => {
+    if (overview?.current_stage) {
+      return overview.current_stage;
+    }
     if (serverContext?.current_stage) {
       const matched = stages.find(s => s.title.toLowerCase() === serverContext.current_stage.toLowerCase());
       if (matched) return matched;
     }
-    return stages.find(s => s.status === 'IN_PROGRESS') || null;
-  }, [stages, serverContext]);
+    return stages.find(s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'NOT_STARTED') || stages[0] || null;
+  }, [stages, serverContext, overview]);
 
   const nextStage = useMemo(() => {
-    return stages.find(s => s.status === 'NOT_STARTED') || null;
-  }, [stages]);
+    if (overview?.next_stage) {
+      return overview.next_stage;
+    }
+    return stages.find(s => s.id > (currentStage?.id || 0)) || null;
+  }, [stages, currentStage, overview]);
 
   const todaysFocus = useMemo(() => {
     let focus: TodaysFocus | null = serverFocus ? { ...serverFocus } : null;
@@ -258,30 +313,18 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
   }, [stages]);
 
   const progressPercentage = useMemo(() => {
-    let totalProgress = 0;
-    let skillCount = 0;
-    for (const cluster of SKILL_CLUSTERS) {
-      for (const skill of cluster.skills) {
-        const effectiveProgress = skillOverrides[skill.id] !== undefined
-          ? skillOverrides[skill.id]
-          : (skillOverrides[skill.name] !== undefined ? skillOverrides[skill.name] : skill.progress);
-        totalProgress += effectiveProgress;
-        skillCount += 1;
-      }
-    }
-    const computedOverall = skillCount > 0 ? Math.round(totalProgress / skillCount) : 33;
-    return computedOverall;
-  }, [skillOverrides]);
+    return overview?.overall_progress ?? (serverContext?.overall_mastery ?? 0);
+  }, [overview, serverContext]);
 
-  // Get relevant skills for snapshot (3-5 skills, prioritized from backend or clusters)
+  // Get relevant skills for snapshot directly from live backend context or current stage
   const snapshotSkills = useMemo(() => {
     if (serverContext?.relevant_skills && serverContext.relevant_skills.length > 0) {
       const serverSkills = serverContext.relevant_skills.map((s: any) => ({
         id: s.id,
         name: s.name,
         domain: s.domain || 'Core Skills',
-        level: s.level || 'Intermediate',
-        progress: skillOverrides[s.id] !== undefined ? skillOverrides[s.id] : s.progress,
+        level: s.level || 'Novice',
+        progress: skillOverrides[s.id] !== undefined ? skillOverrides[s.id] : (s.progress || 0),
         isVerified: Boolean(s.is_verified),
       }));
 
@@ -295,31 +338,28 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
         .slice(0, 5);
     }
 
-    const allSkills: (SkillItem & { domain: string })[] = [];
-    for (const cluster of SKILL_CLUSTERS) {
-      for (const skill of cluster.skills) {
-        const effectiveProgress = skillOverrides[skill.id] !== undefined
-          ? skillOverrides[skill.id]
-          : skill.progress;
-        allSkills.push({ ...skill, progress: effectiveProgress, domain: cluster.categoryName });
-      }
+    // Fallback directly to active stage topics / skills starting at 0%
+    const stageTopics = (currentStage as any)?.topics || [];
+    if (stageTopics.length > 0) {
+      return stageTopics.slice(0, 5).map((t: any) => ({
+        id: t.id,
+        name: t.title,
+        domain: currentStage?.title || 'Active Stage',
+        level: ((t.mastery || 0) >= 70 ? 'Proficient' : ((t.mastery || 0) >= 40 ? 'Developing' : 'Novice')) as SkillItem['level'],
+        progress: skillOverrides[t.id] !== undefined ? skillOverrides[t.id] : (t.progress || t.mastery || 0),
+        isVerified: (t.mastery || 0) >= 75,
+      }));
     }
 
-    const currentSkillNames = currentStage?.skills.map(s => s.toLowerCase()) || [];
-    const focusSkillId = todaysFocus?.skillId;
-
-    return allSkills
-      .filter(s => s.level !== 'Locked')
-      .sort((a, b) => {
-        if (a.id === focusSkillId) return -1;
-        if (b.id === focusSkillId) return 1;
-        const aIsCurrent = currentSkillNames.includes(a.name.toLowerCase());
-        const bIsCurrent = currentSkillNames.includes(b.name.toLowerCase());
-        if (aIsCurrent && !bIsCurrent) return -1;
-        if (!aIsCurrent && bIsCurrent) return 1;
-        return a.progress - b.progress;
-      })
-      .slice(0, 5);
+    const stageSkillNames = currentStage?.skills || ['Python Basics', 'Control Flow', 'Functions'];
+    return stageSkillNames.slice(0, 5).map((name, idx) => ({
+      id: `stage-sk-${idx}`,
+      name,
+      domain: currentStage?.title || 'Active Stage',
+      level: 'Novice' as SkillItem['level'],
+      progress: skillOverrides[name] !== undefined ? skillOverrides[name] : 0,
+      isVerified: false,
+    }));
   }, [serverContext, currentStage, todaysFocus, skillOverrides]);
 
   // Scroll to bottom when messages change
@@ -339,10 +379,13 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
           setServerFocus(ctx.focus);
         }
 
-        // Only inject initial greeting if no messages exist in state or storage
+        // Generate dynamic greeting tailored to current authenticated user
         setMessages(prev => {
-          if (prev.length > 0) return prev;
-          if (ctx?.recent_messages && ctx.recent_messages.length > 0) {
+          // If previous messages contain old demo user 'Alex Rivera' or mismatched greeting, regenerate
+          const hasStaleDemoGreeting = prev.length === 1 && (prev[0].text.includes('Alex Rivera') || prev[0].text.includes('Optimization (10% mastery)'));
+          if (prev.length > 0 && !hasStaleDemoGreeting) return prev;
+
+          if (ctx?.recent_messages && ctx.recent_messages.length > 0 && !hasStaleDemoGreeting) {
             return ctx.recent_messages.map((m: any) => ({
               id: m.id || `msg-${Date.now()}-${Math.random()}`,
               sender: m.sender,
@@ -350,9 +393,10 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
               timestamp: m.timestamp || new Date().toISOString(),
             }));
           }
+
           let effectiveFocus = ctx?.focus ? { ...ctx.focus } : calculateTodaysFocus(stages, SKILL_CLUSTERS, user, skillOverrides);
           if (effectiveFocus) {
-            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill] ?? (effectiveFocus.skill.toLowerCase() === 'optimization' ? (skillOverrides['s7'] ?? skillOverrides['Optimization']) : undefined);
+            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill];
             if (override !== undefined) {
               effectiveFocus.mastery = override;
             }
@@ -368,10 +412,12 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
       } catch (err) {
         console.warn('Backend context initial fetch error:', err);
         setMessages(prev => {
-          if (prev.length > 0) return prev;
+          const hasStaleDemoGreeting = prev.length === 1 && (prev[0].text.includes('Alex Rivera') || prev[0].text.includes('Optimization (10% mastery)'));
+          if (prev.length > 0 && !hasStaleDemoGreeting) return prev;
+
           let effectiveFocus = calculateTodaysFocus(stages, SKILL_CLUSTERS, user, skillOverrides);
           if (effectiveFocus) {
-            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill] ?? (effectiveFocus.skill.toLowerCase() === 'optimization' ? (skillOverrides['s7'] ?? skillOverrides['Optimization']) : undefined);
+            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill];
             if (override !== undefined) {
               effectiveFocus.mastery = override;
             }
@@ -385,7 +431,7 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({ stages, user, onNavi
     };
 
     initMentor();
-  }, []);
+  }, [effectiveUserName, effectiveTargetRole]);
 
   // Send message handler (Live Backend AI with Local Fallback)
   const handleSendMessage = useCallback(async (text?: string) => {

@@ -79,6 +79,8 @@ class RoadmapOverviewResponse(BaseModel):
     current_stage: Optional[RoadmapStageSummary] = None
     next_stage: Optional[RoadmapStageSummary] = None
     estimated_remaining_weeks: int
+    weekly_hours_budget: int = 10
+    target_timeline_months: int = 6
     current_blocker: Optional[str] = None
     next_recommended_action: str
     stages: list[RoadmapStageSummary]

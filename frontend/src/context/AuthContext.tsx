@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: LoginCredentials): Promise<User> => {
     setLoading(true);
     try {
+      clearUserLocalStorage();
       const response = await authService.login(credentials);
       setUser(response.user);
       return response.user;
@@ -71,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (credentials: RegisterCredentials): Promise<User> => {
     setLoading(true);
     try {
+      clearUserLocalStorage();
       const response = await authService.register(credentials);
       setUser(response.user);
       return response.user;
@@ -105,10 +107,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const clearUserLocalStorage = () => {
+    try {
+      localStorage.removeItem('pathai_skill_overrides');
+      localStorage.removeItem('pathai_mentor_messages');
+      localStorage.removeItem('pathai_mentor_assessment_results');
+      localStorage.removeItem('pathai_mentor_assessment_state');
+      localStorage.removeItem('pathai_mentor_assessment_id');
+      localStorage.removeItem('pathai_mentor_session_id');
+      localStorage.removeItem('pathai_mentor_session_active');
+      localStorage.removeItem('pathai_selected_stage_id');
+      localStorage.removeItem('pathai_active_tab');
+    } catch {}
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
       await authService.logout();
+      clearUserLocalStorage();
       setUser(null);
     } finally {
       setLoading(false);

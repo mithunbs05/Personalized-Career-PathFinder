@@ -32,16 +32,30 @@ export const Onboarding: React.FC = () => {
 
       setTimeout(async () => {
         try {
+          const resolvedTargetGoal = (extractedEntities.target_goal as string) ||
+            (extractedEntities.career_goal as string) ||
+            (extractedEntities.careerGoal as string) ||
+            (extractedEntities.job_specialization as string) ||
+            (extractedEntities.target_role as string) ||
+            'Data Scientist';
+
+          const normalizedEntities = {
+            ...extractedEntities,
+            target_goal: resolvedTargetGoal,
+            career_goal: resolvedTargetGoal,
+            target_role: resolvedTargetGoal,
+          };
+
           // 1. Save locally to auth context / localStorage (guarantees local JSON temp persistence)
           await saveOnboarding({
-            targetGoal: (extractedEntities.target_goal as string) || 'AI/ML Engineer',
+            targetGoal: resolvedTargetGoal,
             experienceLevel:
               (extractedEntities.experience_level as 'beginner' | 'intermediate' | 'advanced') ||
               'intermediate',
             knownSkills:
-              Array.isArray(extractedEntities.known_skills) && extractedEntities.known_skills.length > 0
+              Array.isArray(extractedEntities.known_skills)
                 ? (extractedEntities.known_skills as string[])
-                : ['Python'],
+                : [],
             weeklyHours: (extractedEntities.weekly_hours as number) || 10,
             educationDegree: (extractedEntities.education_degree as string) || undefined,
             educationMajor: (extractedEntities.education_major as string) || undefined,
@@ -78,7 +92,7 @@ export const Onboarding: React.FC = () => {
 
           await onboardingService.saveProfile(
             {
-              profile_metadata: extractedEntities,
+              profile_metadata: normalizedEntities,
               completed_categories: completedCategories,
             },
             sessionData.session.access_token

@@ -252,8 +252,8 @@ export function calculateTodaysFocus(
     return skill.progress;
   };
 
-  const currentStage = stages.find(s => s.status === 'IN_PROGRESS');
-  const nextStage = stages.find(s => s.status === 'NOT_STARTED');
+  const currentStage = stages.find(s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'NOT_STARTED') || stages[0];
+  const nextStage = stages.find(s => s.id > (currentStage?.id || 0) && s.status !== 'COMPLETED');
 
   if (!currentStage && !nextStage) {
     return null;
@@ -273,15 +273,12 @@ export function calculateTodaysFocus(
     isCurrentStage: boolean,
     blockingStage: RoadmapStage | null
   ) => {
-    for (const stageSkillName of stage.skills) {
+    const stageSkills = stage.skills && stage.skills.length > 0 ? stage.skills : [stage.title];
+    for (const stageSkillName of stageSkills) {
       const match = allSkills.get(stageSkillName.toLowerCase());
-      if (!match) continue;
-
-      const { skill, domain } = match;
-      const effectiveProgress = getEffectiveProgress(skill);
+      const effectiveProgress = match ? getEffectiveProgress(match.skill) : (stage.progress || 0);
 
       if (effectiveProgress >= 90) continue;
-      if (skill.level === 'Locked') continue;
 
       let score = 0;
       const reasons: string[] = [];
@@ -291,7 +288,7 @@ export function calculateTodaysFocus(
 
       if (isCurrentStage) {
         score += 15;
-        reasons.push(`Part of your current "${stage.title}" stage`);
+        reasons.push(`Part of your active "${stage.title}" milestone`);
       }
 
       let blocksStageTitle: string | null = null;
@@ -303,21 +300,23 @@ export function calculateTodaysFocus(
 
       if (effectiveProgress < 30) {
         score += 20;
-        reasons.push('Critical gap — below 30% mastery');
+        reasons.push('Essential foundational topic — low verified mastery');
       } else if (effectiveProgress < 50) {
         score += 10;
-        reasons.push('Developing — needs focused practice');
-      }
-
-      if (!skill.isVerified) {
-        score += 5;
+        reasons.push('Developing competency — needs focused practice');
       }
 
       scoredSkills.push({
-        skill: { ...skill, progress: effectiveProgress },
-        domain,
+        skill: match ? { ...match.skill, progress: effectiveProgress } : {
+          id: `sk-${stage.id}`,
+          name: stageSkillName,
+          level: effectiveProgress >= 70 ? 'Proficient' : (effectiveProgress >= 40 ? 'Developing' : 'Novice'),
+          progress: effectiveProgress,
+          isVerified: effectiveProgress >= 75,
+        },
+        domain: match ? match.domain : stage.title,
         score,
-        reason: reasons[0] || 'Skill improvement opportunity',
+        reason: reasons[0] || `Core competency for ${stage.title}`,
         blocksStage: blocksStageTitle,
       });
     }
@@ -329,12 +328,25 @@ export function calculateTodaysFocus(
 
   if (nextStage) {
     const stageAfterNext = stages.find(
-      s => s.status === 'LOCKED' && s.prerequisites.includes(nextStage.title)
+      s => s.status === 'LOCKED' && s.prerequisites && s.prerequisites.includes(nextStage.title)
     );
     scoreSkillsForStage(nextStage, false, stageAfterNext || null);
   }
 
   if (scoredSkills.length === 0) {
+    if (currentStage) {
+      return {
+        domain: currentStage.title,
+        skill: (currentStage.skills && currentStage.skills[0]) || currentStage.title,
+        skillId: `stg-${currentStage.id}`,
+        topic: null,
+        priority: 'HIGH',
+        mastery: currentStage.progress || 0,
+        estimatedMinutes: 30,
+        reason: `Targeting active milestone '${currentStage.title}' to advance your roadmap progress.`,
+        blocksStage: nextStage?.title || null,
+      };
+    }
     return null;
   }
 

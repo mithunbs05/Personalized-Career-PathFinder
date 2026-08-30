@@ -22,27 +22,17 @@ interface NlpOnboardingBotProps {
 }
 
 // ---------------------------------------------------------------------------
-// 15 Profile Categories
+// 5 Core Profile Categories
 // ---------------------------------------------------------------------------
 const CATEGORIES = [
-  { key: 'education', label: 'Education', icon: GraduationCap },
-  { key: 'professionalProfiles', label: 'Profiles', icon: Globe },
-  { key: 'industryExperience', label: 'Experience', icon: Briefcase },
-  { key: 'technicalStack', label: 'Tech Stack', icon: Code },
-  { key: 'projects', label: 'Projects', icon: FolderGit2 },
-  { key: 'completedLearning', label: 'Learning', icon: BookOpen },
-  { key: 'technicalInterests', label: 'Interests', icon: Heart },
-  { key: 'careerGoal', label: 'Career Goal', icon: Target },
-  { key: 'targetTimeline', label: 'Timeline', icon: Clock },
-  { key: 'salaryGoal', label: 'Salary Goal', icon: Award },
-  { key: 'weeklyHours', label: 'Weekly Hrs', icon: Clock },
-  { key: 'learningFormat', label: 'Format', icon: Layers },
-  { key: 'resourceBudget', label: 'Budget', icon: Wallet },
-  { key: 'immediateMotivation', label: 'Motivation', icon: Flame },
-  { key: 'languagePreference', label: 'Language', icon: Languages },
+  { key: 'careerGoal', label: 'Target Track', icon: Target },
+  { key: 'industryExperience', label: 'Experience Tier', icon: Briefcase },
+  { key: 'technicalStack', label: 'Known Skills', icon: Code },
+  { key: 'weeklyHours', label: 'Weekly Hours', icon: Clock },
+  { key: 'targetTimeline', label: 'Target Timeline', icon: Layers },
 ] as const;
 
-const TOTAL_CATEGORIES = CATEGORIES.length; // 15
+const TOTAL_CATEGORIES = CATEGORIES.length; // 5
 
 // ---------------------------------------------------------------------------
 // Component
@@ -153,13 +143,13 @@ export const NlpOnboardingBot: React.FC<NlpOnboardingBotProps> = ({
           id: 'msg-onboard-init',
           role: 'assistant',
           content:
-            "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap together across 15 diagnostic categories.\n\nTo begin, what are your **education details**? (Please share your degree, major/branch, and graduation year).",
+            "Welcome to PathAI! 🎯 I'm your career diagnostic assistant. Let's build your personalized learning roadmap in **5 quick questions**.\n\nTo begin, what **target career role** are you aiming for? (e.g. *Data Scientist*, *Machine Learning Engineer*, *AI / LLM Engineer*, *Full Stack AI Developer*).",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           quickReplyChips: [
-            'B.Tech Computer Science (2025)',
-            'B.Sc Information Technology (2024)',
-            'MCA (2026)',
-            'Non-CS Degree background',
+            'Data Scientist',
+            'Machine Learning Engineer',
+            'AI Application / LLM Engineer',
+            'Full Stack AI Developer',
           ],
         };
         setMessages([fallbackMsg]);

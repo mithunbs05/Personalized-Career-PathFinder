@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import onboarding, profile, mentor, roadmap
+from app.routers import onboarding, profile, mentor, roadmap, pipeline
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -59,6 +59,7 @@ app.include_router(onboarding.router)
 app.include_router(profile.router)
 app.include_router(mentor.router)
 app.include_router(roadmap.router)
+app.include_router(pipeline.router)
 
 
 # ---------------------------------------------------------------------------

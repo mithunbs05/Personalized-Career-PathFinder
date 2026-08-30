@@ -1,75 +1,38 @@
-import React, { useState, useMemo } from 'react';
-import { Target, CheckCircle2, AlertTriangle, ShieldCheck, FileCheck, X, Activity, GraduationCap, ChevronRight, Download, BrainCircuit, ExternalLink, Lock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Target,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldCheck,
+  FileCheck,
+  X,
+  Activity,
+  GraduationCap,
+  ChevronRight,
+  Download,
+  BrainCircuit,
+  ExternalLink,
+  Lock,
+} from 'lucide-react';
 import { SkillCluster, SkillItem, RadarMetric } from '../../types/roadmap';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  pipelineService,
+  LearnerKnowledgeProfile,
+  RoleGapAnalysisPayload,
+  TopicKnowledgeItem,
+} from '../../services/pipeline.service';
 
-const MOCK_RADAR_DATA: RadarMetric[] = [
-  { subject: 'Python & DSA', currentLevel: 85, industryBenchmark: 90, fullMark: 100 },
-  { subject: 'Data Wrangling', currentLevel: 75, industryBenchmark: 80, fullMark: 100 },
-  { subject: 'Math & Calculus', currentLevel: 45, industryBenchmark: 75, fullMark: 100 },
-  { subject: 'Classical ML', currentLevel: 70, industryBenchmark: 70, fullMark: 100 },
-  { subject: 'Deep Learning', currentLevel: 30, industryBenchmark: 85, fullMark: 100 },
-  { subject: 'NLP & Transformers', currentLevel: 15, industryBenchmark: 80, fullMark: 100 },
-  { subject: 'GenAI & LLMs', currentLevel: 10, industryBenchmark: 85, fullMark: 100 },
-  { subject: 'RAG & MLOps', currentLevel: 10, industryBenchmark: 75, fullMark: 100 },
-];
-
-const NEW_CLUSTERS: SkillCluster[] = [
-  {
-    id: 'c1',
-    categoryName: 'Foundations & Data Processing',
-    description: 'Python OOP, NumPy Vectorization, Pandas Wrangling.',
-    skills: [
-      { id: 's1', name: 'Python OOP', level: 'Advanced', progress: 95, isVerified: true, verificationDetails: { courseName: 'Advanced Python', labScore: 92 } },
-      { id: 's2', name: 'NumPy Vectorization', level: 'Advanced', progress: 90, isVerified: true, verificationDetails: { labScore: 88 } },
-      { id: 's3', name: 'Pandas Wrangling', level: 'Proficient', progress: 75, isVerified: true, verificationDetails: { assessmentScore: 80 } },
-      { id: 's4', name: 'Asymptotic Complexity', level: 'Developing', progress: 45, isVerified: false }
-    ]
-  },
-  {
-    id: 'c2',
-    categoryName: 'Applied Mathematics',
-    description: 'Linear Algebra, Multivariate Calculus, Bayesian Probability.',
-    skills: [
-      { id: 's5', name: 'Linear Algebra', level: 'Developing', progress: 45, isVerified: false },
-      { id: 's6', name: 'Multivariate Calculus', level: 'Novice', progress: 20, isVerified: false },
-      { id: 's7', name: 'Bayesian Probability', level: 'Proficient', progress: 70, isVerified: true, verificationDetails: { assessmentScore: 75 } },
-      { id: 's8', name: 'Loss Optimization', level: 'Developing', progress: 40, isVerified: false }
-    ]
-  },
-  {
-    id: 'c3',
-    categoryName: 'Machine Learning Foundations',
-    description: 'Scikit-Learn Pipelines, Random Forest/XGBoost, Cross-Validation.',
-    skills: [
-      { id: 's9', name: 'Scikit-Learn Pipelines', level: 'Proficient', progress: 75, isVerified: true, verificationDetails: { labScore: 82 } },
-      { id: 's10', name: 'Random Forest/XGBoost', level: 'Developing', progress: 55, isVerified: false },
-      { id: 's11', name: 'Cross-Validation & Metrics', level: 'Proficient', progress: 80, isVerified: true, verificationDetails: { assessmentScore: 85 } }
-    ]
-  },
-  {
-    id: 'c4',
-    categoryName: 'Deep Learning & NLP',
-    description: 'PyTorch Tensors, CNNs, Multi-Head Attention, Hugging Face.',
-    skills: [
-      { id: 's12', name: 'PyTorch Tensors', level: 'Developing', progress: 50, isVerified: false },
-      { id: 's13', name: 'CNNs', level: 'Novice', progress: 20, isVerified: false },
-      { id: 's14', name: 'Multi-Head Attention', level: 'Locked', progress: 0, isVerified: false },
-      { id: 's15', name: 'Hugging Face Tokenizers', level: 'Novice', progress: 10, isVerified: false }
-    ]
-  },
-  {
-    id: 'c5',
-    categoryName: 'Generative AI, RAG & MLOps',
-    description: 'LoRA Fine-Tuning, Vector DBs, FastAPI, Docker.',
-    skills: [
-      { id: 's16', name: 'LoRA/QLoRA Fine-Tuning', level: 'Locked', progress: 0, isVerified: false },
-      { id: 's17', name: 'Vector DBs (Qdrant)', level: 'Locked', progress: 0, isVerified: false },
-      { id: 's18', name: 'FastAPI Endpoints', level: 'Novice', progress: 15, isVerified: false },
-      { id: 's19', name: 'Docker Containerization', level: 'Developing', progress: 40, isVerified: false }
-    ]
-  }
+const DEFAULT_RADAR_DATA: RadarMetric[] = [
+  { subject: 'Programming & DSA', currentLevel: 0, industryBenchmark: 85, fullMark: 100 },
+  { subject: 'Data Wrangling', currentLevel: 0, industryBenchmark: 80, fullMark: 100 },
+  { subject: 'Applied Math', currentLevel: 0, industryBenchmark: 75, fullMark: 100 },
+  { subject: 'Classical ML', currentLevel: 0, industryBenchmark: 80, fullMark: 100 },
+  { subject: 'Deep Learning', currentLevel: 0, industryBenchmark: 80, fullMark: 100 },
+  { subject: 'NLP & Transformers', currentLevel: 0, industryBenchmark: 75, fullMark: 100 },
+  { subject: 'GenAI & LLMs', currentLevel: 0, industryBenchmark: 80, fullMark: 100 },
+  { subject: 'MLOps & APIs', currentLevel: 0, industryBenchmark: 75, fullMark: 100 },
 ];
 
 const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[], simulatedBoost: number }) => {
@@ -205,10 +168,185 @@ const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[], simulatedBo
   );
 };
 
-export const SkillMatrix: React.FC = () => {
+interface SkillMatrixProps {
+  onNavigateToMentor?: (context?: {
+    stageTitle?: string;
+    stageId?: number;
+    skillName?: string;
+    skillFocus?: string;
+    topicTitle?: string;
+    mastery?: number;
+    mode?: 'learn' | 'practice' | 'assess';
+    reason?: string;
+  }) => void;
+  onNavigateToRoadmap?: () => void;
+}
+
+export const SkillMatrix: React.FC<SkillMatrixProps> = ({ onNavigateToMentor, onNavigateToRoadmap }) => {
   const [selectedSkill, setSelectedSkill] = useState<SkillItem | null>(null);
   const [filterTab, setFilterTab] = useState<'All' | 'Verified' | 'In Progress' | 'Critical Gaps'>('All');
   const [simulatedLabs, setSimulatedLabs] = useState(0);
+
+  const [knowledgeProfile, setKnowledgeProfile] = useState<LearnerKnowledgeProfile | null>(null);
+  const [roleGaps, setRoleGaps] = useState<RoleGapAnalysisPayload | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch live knowledge state from pipeline
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMatrixData = async () => {
+      try {
+        setIsLoading(true);
+        const [kProf, gaps] = await Promise.allSettled([
+          pipelineService.getKnowledgeProfile(),
+          pipelineService.getSkillGaps(),
+        ]);
+        if (isMounted) {
+          if (kProf.status === 'fulfilled') setKnowledgeProfile(kProf.value);
+          if (gaps.status === 'fulfilled') setRoleGaps(gaps.value);
+        }
+      } catch (err) {
+        console.warn('Could not load pipeline data for SkillMatrix:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    fetchMatrixData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Dynamic Skill Overrides from live assessments / mentor
+  const skillOverrides: Record<string, number> = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('pathai_skill_overrides');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  // Domain definitions for canonical clustering
+  const DOMAIN_GROUPS = useMemo(() => [
+    { id: 'c1', name: 'Programming & Data Structures', desc: 'Python syntax, control flow, functions, OOP, and data structures.' },
+    { id: 'c2', name: 'Applied Mathematics & Statistics', desc: 'Linear algebra matrices, calculus gradients, and Bayesian probability.' },
+    { id: 'c3', name: 'Data Wrangling & Feature Engineering', desc: 'NumPy broadcasting, Pandas dataframes, and feature prep.' },
+    { id: 'c4', name: 'Machine Learning Foundations', desc: 'Regression, Decision Trees, XGBoost, and model evaluation.' },
+    { id: 'c5', name: 'Deep Learning & Neural Networks', desc: 'PyTorch tensors, neural net architectures, and autograd.' },
+    { id: 'c6', name: 'NLP, Attention & Transformers', desc: 'Tokenizers, vector embeddings, and self-attention.' },
+    { id: 'c7', name: 'Generative AI, RAG & LLMs', desc: 'PEFT/LoRA fine-tuning, RAG retrieval, and vector databases.' },
+    { id: 'c8', name: 'MLOps, APIs & Cloud Deployment', desc: 'FastAPI microservices, Docker containerization, and deployment.' },
+  ], []);
+
+  // Compute live updated clusters from knowledge state
+  const liveClusters: SkillCluster[] = useMemo(() => {
+    if (!knowledgeProfile || !knowledgeProfile.topics) {
+      return DOMAIN_GROUPS.map(g => ({
+        id: g.id,
+        categoryName: g.name,
+        description: g.desc,
+        skills: [],
+      }));
+    }
+
+    const topicsList: TopicKnowledgeItem[] = Object.values(knowledgeProfile.topics);
+
+    return DOMAIN_GROUPS.map((g) => {
+      const domainTopics = topicsList.filter(t => t.domain.toLowerCase().includes(g.name.split('&')[0].trim().toLowerCase()) || g.name.toLowerCase().includes(t.domain.toLowerCase()));
+
+      const skills: SkillItem[] = domainTopics.map(t => {
+        const override = skillOverrides[t.topic_id] ?? skillOverrides[t.skill_id] ?? skillOverrides[t.topic_title];
+        const progress = override !== undefined ? override : (t.status !== 'UNKNOWN' ? t.mastery : 0);
+
+        let level: SkillItem['level'] = 'Novice';
+        if (progress >= 85) level = 'Advanced';
+        else if (progress >= 70) level = 'Proficient';
+        else if (progress >= 40) level = 'Developing';
+        else if (progress > 0) level = 'Novice';
+        else level = 'Locked';
+
+        const isVerified = (t.evidence_count > 0 && progress >= 75) || progress >= 80;
+
+        return {
+          id: t.topic_id,
+          name: t.topic_title,
+          level,
+          progress,
+          isVerified,
+          verificationDetails: isVerified ? {
+            courseName: `${t.domain} Mastery`,
+            assessmentScore: Math.max(progress, 75),
+            verifiedAt: 'Active Evidence',
+          } : undefined,
+        };
+      });
+
+      return {
+        id: g.id,
+        categoryName: g.name,
+        description: g.desc,
+        skills,
+      };
+    }).filter(c => c.skills.length > 0);
+  }, [knowledgeProfile, skillOverrides, DOMAIN_GROUPS]);
+
+  // Compute dynamic radar metrics directly from domain masteries
+  const dynamicRadarData: RadarMetric[] = useMemo(() => {
+    const domainMasteries = knowledgeProfile?.domain_masteries || {};
+
+    const getDomainScore = (domainKey: string, fallback: number = 0) => {
+      for (const [dName, val] of Object.entries(domainMasteries)) {
+        if (dName.toLowerCase().includes(domainKey.toLowerCase())) {
+          return val;
+        }
+      }
+      return fallback;
+    };
+
+    return [
+      { subject: 'Programming & DSA', currentLevel: getDomainScore('Programming', 0), industryBenchmark: 85, fullMark: 100 },
+      { subject: 'Data Wrangling', currentLevel: getDomainScore('Data Wrangling', 0), industryBenchmark: 80, fullMark: 100 },
+      { subject: 'Applied Math', currentLevel: getDomainScore('Mathematics', 0), industryBenchmark: 75, fullMark: 100 },
+      { subject: 'Classical ML', currentLevel: getDomainScore('Machine Learning', 0), industryBenchmark: 80, fullMark: 100 },
+      { subject: 'Deep Learning', currentLevel: getDomainScore('Deep Learning', 0), industryBenchmark: 80, fullMark: 100 },
+      { subject: 'NLP & Attention', currentLevel: getDomainScore('NLP', 0), industryBenchmark: 75, fullMark: 100 },
+      { subject: 'GenAI & LLMs', currentLevel: getDomainScore('Generative AI', 0), industryBenchmark: 80, fullMark: 100 },
+      { subject: 'MLOps & APIs', currentLevel: getDomainScore('MLOps', 0), industryBenchmark: 75, fullMark: 100 },
+    ];
+  }, [knowledgeProfile]);
+
+  // Total Verified Skills count
+  const verifiedCount = useMemo(() => {
+    let count = 0;
+    for (const c of liveClusters) {
+      count += c.skills.filter(s => s.isVerified).length;
+    }
+    return count;
+  }, [liveClusters]);
+
+  const totalSkillsCount = useMemo(() => {
+    let count = 0;
+    for (const c of liveClusters) {
+      count += c.skills.length;
+    }
+    return count;
+  }, [liveClusters]);
+
+  // Mean Role Readiness
+  const baseReadiness = useMemo(() => {
+    let total = 0;
+    let count = 0;
+    for (const c of liveClusters) {
+      for (const s of c.skills) {
+        total += s.progress;
+        count += 1;
+      }
+    }
+    return count > 0 ? Math.round(total / count) : 0;
+  }, [liveClusters]);
+
+  const simulatedReadiness = Math.min(100, baseReadiness + (simulatedLabs * 3));
 
   const getLevelColor = (level: SkillItem['level']) => {
     switch (level) {
@@ -235,7 +373,7 @@ export const SkillMatrix: React.FC = () => {
   };
 
   const filteredClusters = useMemo(() => {
-    return NEW_CLUSTERS.map(cluster => {
+    return liveClusters.map(cluster => {
       const filteredSkills = cluster.skills.filter(skill => {
         if (filterTab === 'All') return true;
         if (filterTab === 'Verified') return skill.isVerified;
@@ -245,11 +383,7 @@ export const SkillMatrix: React.FC = () => {
       });
       return { ...cluster, skills: filteredSkills };
     }).filter(cluster => cluster.skills.length > 0);
-  }, [filterTab]);
-
-  // Base market readiness
-  const baseReadiness = 54;
-  const simulatedReadiness = Math.min(100, baseReadiness + (simulatedLabs * 3));
+  }, [liveClusters, filterTab]);
 
   return (
     <div className="w-full space-y-6">
@@ -262,7 +396,16 @@ export const SkillMatrix: React.FC = () => {
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">Benchmarked against industry standards for AI/ML Engineer</p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-700 dark:text-slate-300 hover:border-[#ea580c] hover:text-[#ea580c] transition-all shadow-sm">
+        <button 
+          onClick={() => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(liveClusters, null, 2));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", "pathai_verified_skills.json");
+            dl.click();
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-700 dark:text-slate-300 hover:border-[#ea580c] hover:text-[#ea580c] transition-all shadow-sm cursor-pointer"
+        >
           <Download className="w-4 h-4" />
           <span>Export Verified Profile</span>
         </button>
@@ -282,7 +425,7 @@ export const SkillMatrix: React.FC = () => {
           
           <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Competency Radar</h3>
           
-          <RadarChart data={MOCK_RADAR_DATA} simulatedBoost={simulatedLabs * 10} />
+          <RadarChart data={dynamicRadarData} simulatedBoost={simulatedLabs * 10} />
         </div>
 
         {/* Right: Job Role Readiness & What-If Simulator */}
@@ -317,8 +460,8 @@ export const SkillMatrix: React.FC = () => {
             </div>
             
             <div className="flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400">
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 6/19 Verified Core Skills</span>
-              <span className="flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-amber-500" /> 2 Critical Blockers</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> {verifiedCount}/{totalSkillsCount} Verified Core Skills</span>
+              <span className="flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-amber-500" /> Critical Gap: Optimization</span>
             </div>
           </div>
 
@@ -331,13 +474,16 @@ export const SkillMatrix: React.FC = () => {
                 <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-amber-100 dark:border-amber-900/50 text-amber-600 dark:text-amber-500">
                   <Activity className="w-5 h-5" />
                 </div>
-                <h4 className="font-bold text-amber-900 dark:text-amber-400 text-sm">Critical Blocker</h4>
+                <h4 className="font-bold text-amber-900 dark:text-amber-400 text-sm">Prerequisite Blocker</h4>
               </div>
               <p className="text-xs text-amber-700 dark:text-amber-500 leading-relaxed mb-4">
-                <strong>Linear Algebra & Optimization</strong> is at 45% — recommended threshold is 75% before starting Deep Learning.
+                <strong>Optimization & Calculus</strong> — target benchmark is 80% mastery to unblock downstream Machine Learning stages.
               </p>
-              <button className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
-                Launch 15-Min Remedial Lab
+              <button 
+                onClick={() => onNavigateToMentor?.({ stageTitle: 'Mathematics & Statistics', stageId: 3, skillFocus: 'Optimization', mode: 'assess' })}
+                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Resolve in AI Mentor →
               </button>
             </div>
 
@@ -544,15 +690,49 @@ export const SkillMatrix: React.FC = () => {
 
               {/* Drawer Footer Actions */}
               <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
-                 <button className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#ea580c] hover:bg-[#d84d08] text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-[#ea580c]/20 hover:-translate-y-0.5">
-                    {selectedSkill.isVerified ? 'Retake Diagnostic Assessment' : 'Launch Assessment Sandbox'}
+                 <button 
+                   onClick={() => {
+                     const sName = selectedSkill.name;
+                     const sProg = selectedSkill.progress;
+                     setSelectedSkill(null);
+                     onNavigateToMentor?.({
+                       topicTitle: sName,
+                       skillName: sName,
+                       mastery: sProg,
+                       mode: 'assess',
+                       reason: `Evaluating knowledge state in ${sName}.`,
+                     });
+                   }}
+                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#ea580c] hover:bg-[#d84d08] text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-[#ea580c]/20 hover:-translate-y-0.5 cursor-pointer"
+                 >
+                    {selectedSkill.isVerified ? 'Retake Diagnostic Assessment in Mentor' : 'Launch Assessment Sandbox'}
                  </button>
                  <div className="flex gap-3">
-                   <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm">
+                   <button 
+                     onClick={() => {
+                       setSelectedSkill(null);
+                       onNavigateToRoadmap?.();
+                     }}
+                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm cursor-pointer"
+                   >
                       <ExternalLink className="w-4 h-4" /> View Map
                    </button>
-                   <button className="flex-1 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm">
-                      Practice Lab
+                   <button 
+                     onClick={() => {
+                       const sName = selectedSkill.name;
+                       const sProg = selectedSkill.progress;
+                       setSelectedSkill(null);
+                       onNavigateToMentor?.({
+                         topicTitle: sName,
+                         skillName: sName,
+                         mastery: sProg,
+                         mode: 'practice',
+                         reason: `Practicing targeted questions for ${sName}.`,
+                       });
+                     }}
+                     className="flex-1 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm cursor-pointer"
+                   >
+                      Practice in Mentor
                    </button>
                  </div>
               </div>

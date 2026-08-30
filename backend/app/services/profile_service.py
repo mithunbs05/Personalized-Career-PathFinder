@@ -65,6 +65,8 @@ async def save_profile(
         if access_token:
             client.postgrest.auth(access_token)
 
+        from app.services.mentor_service import _IN_MEMORY_PROFILES, _ensure_valid_uuid
+
         # 1. Upsert into profiles table
         profile_data = {
             "user_id": user_id,
@@ -72,6 +74,11 @@ async def save_profile(
             "completed_categories": completed_categories or [],
             "onboarding_completed": True,
         }
+
+        # Cache in memory immediately for fast access across services
+        valid_uid = _ensure_valid_uuid(user_id)
+        _IN_MEMORY_PROFILES[valid_uid] = profile_data
+        _IN_MEMORY_PROFILES[user_id] = profile_data
 
         try:
             client.table("profiles").upsert(

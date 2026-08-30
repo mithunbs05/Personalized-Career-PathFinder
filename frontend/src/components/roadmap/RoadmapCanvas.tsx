@@ -124,6 +124,15 @@ export const RoadmapCanvas: React.FC<RoadmapCanvasProps> = ({
     [onSelectStage]
   );
 
+  if (stages.length === 0) {
+    return (
+      <div className="w-full h-[600px] bg-[#f8fafc] dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[#ea580c] border-t-transparent animate-spin" />
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Synthesizing personalized curriculum roadmap...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-[600px] bg-[#f8fafc] dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden">
       <ReactFlow

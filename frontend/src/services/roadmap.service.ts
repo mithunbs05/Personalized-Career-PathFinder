@@ -76,14 +76,17 @@ export interface RoadmapOverviewResponse {
   current_stage: RoadmapStageSummary | null;
   next_stage: RoadmapStageSummary | null;
   estimated_remaining_weeks: number;
+  weekly_hours_budget?: number;
+  target_timeline_months?: number;
   current_blocker: string | null;
   next_recommended_action: string;
   stages: RoadmapStageSummary[];
 }
 
 export const roadmapService = {
-  async getRoadmap(): Promise<RoadmapOverviewResponse> {
-    return request<RoadmapOverviewResponse>('/roadmap');
+  async getRoadmap(role?: string): Promise<RoadmapOverviewResponse> {
+    const url = role ? `/roadmap?role=${encodeURIComponent(role)}` : '/roadmap';
+    return request<RoadmapOverviewResponse>(url);
   },
 
   async getStageDetails(stageId: number): Promise<RoadmapStageDetail> {
