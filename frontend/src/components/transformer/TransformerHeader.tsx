@@ -15,6 +15,7 @@ import {
 interface TransformerHeaderProps {
   currentModule: TransformerModule;
   onSelectModule: (module: TransformerModule) => void;
+  availableModules?: TransformerModule[];
   currentMode: LearningMode;
   onToggleMode: (newMode: LearningMode) => void;
   progress: LearnerProgress;
@@ -24,6 +25,7 @@ interface TransformerHeaderProps {
 export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
   currentModule,
   onSelectModule,
+  availableModules,
   currentMode,
   onToggleMode,
   progress,
@@ -33,6 +35,7 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
 
   // Overall unified progress percentage
   const unifiedPercent = Math.round((progress.conceptScore * 0.4) + (progress.practiceScore * 0.6));
+  const modulesList = availableModules && availableModules.length > 0 ? availableModules : TRANSFORMER_MODULES;
 
   return (
     <header className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-2xl p-5 sm:px-6 sm:py-5 shadow-xs transition-colors">
@@ -41,7 +44,7 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
         
         {/* Left: Meta line */}
         <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
-          <span className="text-[#FF5A3D] font-bold">CORE PYTHON</span>
+          <span className="text-[#FF5A3D] font-bold">{currentModule.stageTitle ? currentModule.stageTitle.toUpperCase() : 'CURRICULUM'}</span>
           <span className="text-slate-300 dark:text-slate-700">•</span>
           <span>{currentModule.duration || '25 min'}</span>
           <span className="text-slate-300 dark:text-slate-700">•</span>
@@ -98,7 +101,7 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
                 Select Curriculum Module
               </div>
               <div className="max-h-60 overflow-y-auto space-y-1 pt-1">
-                {TRANSFORMER_MODULES.map((mod) => (
+                {modulesList.map((mod) => (
                   <button
                     key={mod.id}
                     onClick={() => {

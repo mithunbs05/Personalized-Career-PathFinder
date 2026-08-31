@@ -139,6 +139,9 @@ export interface LearnerKnowledgeProfile {
   overall_confidence: number;
   topics: Record<string, TopicKnowledgeItem>;
   domain_masteries: Record<string, number>;
+  engineering_domain?: string;
+  subdomain_masteries?: Record<string, number>;
+  domain_hierarchy?: Record<string, Record<string, string[]>>;
   updated_at: string;
 }
 

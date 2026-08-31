@@ -109,7 +109,11 @@ export const LearnerProfileTab: React.FC<LearnerProfileTabProps> = ({
                 </span>
               </div>
               <p className="text-sm text-slate-400 font-medium">{userEmail}</p>
-              <div className="flex items-center gap-4 text-xs text-slate-300 pt-1">
+              <div className="flex items-center gap-3 text-xs text-slate-300 pt-1 flex-wrap">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 border border-white/10 text-emerald-300 font-bold">
+                  <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                  {knowledgeProfile?.engineering_domain || 'Computer & IT Engineering'}
+                </span>
                 <span className="flex items-center gap-1.5">
                   <Target className="w-3.5 h-3.5 text-[#ff4726]" />
                   Goal: <strong className="text-white font-bold">{targetGoal}</strong>

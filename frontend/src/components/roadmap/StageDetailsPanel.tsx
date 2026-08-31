@@ -32,6 +32,7 @@ import { cn } from '../../lib/utils';
 interface StageDetailsPanelProps {
   stage: RoadmapStageDetail | null;
   overview: RoadmapOverviewResponse | null;
+  targetRole?: string;
   isLoading: boolean;
   onSelectStage: (stageId: number) => void;
   onStartStage: (stageId: number) => void;
@@ -43,6 +44,7 @@ interface StageDetailsPanelProps {
 export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
   stage,
   overview,
+  targetRole,
   isLoading,
   onSelectStage,
   onStartStage,
@@ -100,6 +102,7 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
   // VIEW 1: ROADMAP OVERVIEW (When no stage is selected)
   // ---------------------------------------------------------------------------
   if (!stage) {
+    const displayRole = overview?.target_role || targetRole || 'Learner Curriculum';
     return (
       <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col h-[800px] overflow-hidden lg:sticky lg:top-24">
         {/* Header */}
@@ -111,7 +114,7 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
             <h2 className="text-xl font-black text-slate-900 dark:text-white">Roadmap Overview</h2>
           </div>
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-            {overview?.target_role || 'Data Scientist'}
+            {displayRole}
           </span>
         </div>
 
