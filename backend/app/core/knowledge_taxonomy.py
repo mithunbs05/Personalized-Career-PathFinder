@@ -26,6 +26,9 @@ class TopicDefinition(BaseModel):
     prerequisites: list[str] = Field(default_factory=list)  # topic IDs
     key_concepts: list[str] = Field(default_factory=list)
     benchmark_mastery: int = 75
+    subdomain: Optional[str] = None
+    specialization: Optional[str] = None
+    engineering_domain: Optional[str] = None
 
 class SkillDefinition(BaseModel):
     id: str
@@ -34,6 +37,8 @@ class SkillDefinition(BaseModel):
     description: str
     topics: list[TopicDefinition]
     prerequisites: list[str] = Field(default_factory=list)  # skill IDs
+    subdomain: Optional[str] = None
+    engineering_domain: Optional[str] = None
 
 class RoleRequirement(BaseModel):
     role_id: str
@@ -46,6 +51,9 @@ class RoleRequirement(BaseModel):
     skill_weights: dict[str, float]  # skill_name -> relative importance weight [0.0 - 1.0]
     typical_duration_weeks: int = 24
     minimum_weekly_hours: int = 8
+    engineering_domain: Optional[str] = "Computer & IT"
+    subdomain: Optional[str] = None
+    specialization: Optional[str] = None
 
 class ResourceDefinition(BaseModel):
     id: str
@@ -57,6 +65,127 @@ class ResourceDefinition(BaseModel):
     difficulty: str
     target_topic_ids: list[str]
     learning_outcomes: list[str]
+
+# ---------------------------------------------------------------------------
+# Canonical 18-Domain Hierarchical Engineering Taxonomy Tree
+# ---------------------------------------------------------------------------
+
+ENGINEERING_TAXONOMY_TREE: dict[str, dict[str, list[str]]] = {
+    "Computer & IT": {
+        "Artificial Intelligence": ["Machine Learning", "Deep Learning", "NLP", "Computer Vision", "Generative AI & LLMs"],
+        "Software Engineering": ["Full Stack Web", "Systems Programming", "Architecture & Clean Code", "API Engineering"],
+        "Cybersecurity": ["Network Security", "Ethical Hacking & Pentesting", "Applied Cryptography", "Application Security & SOC"],
+        "Cloud Computing": ["DevOps & SRE", "Kubernetes & Containers", "Infrastructure as Code", "Cloud Architecture"],
+        "Data Engineering": ["Big Data Pipelines", "ETL & Orchestration", "Data Warehousing", "Stream Processing"],
+    },
+    "Electronics & Electrical": {
+        "VLSI": ["Digital IC Design", "Verilog & VHDL", "Physical Design & Synthesis", "FPGA Prototyping"],
+        "Embedded Systems": ["Embedded C/C++", "Microcontroller Architecture", "Real-Time Operating Systems (RTOS)", "Hardware Protocols", "Embedded Linux & Drivers"],
+        "Power Systems": ["Power Generation & Smart Grids", "High Voltage Engineering", "Power Electronics & Inverters", "Renewable Energy Integration"],
+        "Telecommunications": ["Wireless & 5G/6G Networks", "RF & Microwave Engineering", "Signal Processing & DSP", "Optical Fiber Communications"],
+    },
+    "Mechanical": {
+        "Automotive": ["EV Powertrain & Battery Tech", "Vehicle Dynamics & Aerodynamics", "Internal Combustion & Hybrid", "Autonomous Vehicles & ADAS"],
+        "Manufacturing": ["CNC Machining & Precision Engineering", "Additive Manufacturing (3D Printing)", "Quality Engineering & Six Sigma", "CAD/CAM Modeling"],
+        "Mechatronics": ["Industrial Automation & PLC", "Sensors & Actuators Interfacing", "Microcontroller & Motor Drives", "Pneumatics & Hydraulics"],
+        "Robotics": ["ROS & ROS2 Architecture", "Robot Kinematics & Dynamics", "Autonomous Navigation & SLAM", "Motion Planning & Control"],
+    },
+    "Civil & Infrastructure": {
+        "Structural": ["Structural Analysis & FEA", "Reinforced Concrete & Steel Design", "Earthquake & Wind Engineering", "Bridge Engineering"],
+        "Construction": ["BIM & Construction Project Management", "Estimating, Scheduling & Cost Control", "Construction Safety & Building Codes", "Heavy Civil Methods"],
+        "Transportation": ["Traffic Flow & Transport Planning", "Highway & Pavement Design", "Rail & Transit Engineering", "Airport & Port Infrastructure"],
+        "Geotechnical": ["Soil Mechanics & Foundation Design", "Slope Stability & Earth Retaining", "Tunneling & Underground Spaces", "Geo-Environmental Engineering"],
+    },
+    "Chemical & Process": {
+        "Process Engineering": ["Chemical Thermodynamics & Kinetics", "Reaction Engineering & Catalysis", "Separation Processes", "Process Dynamics & Plant Safety"],
+    },
+    "Aerospace & Space": {
+        "Aerospace Engineering": ["Aerodynamics & Compressible Flow", "Flight Dynamics, Stability & Control", "Rocket & Jet Propulsion", "Avionics & Spacecraft Systems", "Orbital Mechanics & Astrodynamics"],
+    },
+    "Biomedical & Biotechnology": {
+        "Biomedical Engineering": ["Biomechanics & Orthopedics", "Medical Imaging & Diagnostic Signals", "Biomaterials & Tissue Engineering", "Bioinstrumentation & Neural Engineering"],
+    },
+    "Materials & Metallurgy": {
+        "Materials Science": ["Physical Metallurgy & Phase Diagrams", "Polymer Science & Biomaterials", "Ceramics & Composite Materials", "Nanomaterials & Characterization"],
+    },
+    "Environmental & Sustainability": {
+        "Environmental Engineering": ["Water & Wastewater Treatment", "Air Pollution Control & Carbon Capture", "Solid Waste Management & Circular Economy", "Environmental Impact Assessment"],
+    },
+    "Industrial & Manufacturing": {
+        "Industrial Engineering": ["Operations Research & Supply Chain Optimization", "Lean Manufacturing & Kaizen Systems", "Facilities Layout & Logistics", "Ergonomics & Human Factors"],
+    },
+    "Mining & Earth": {
+        "Mining & Geological Engineering": ["Rock Mechanics & Ground Control", "Mineral Exploration & Geophysics", "Surface & Underground Mining Systems", "Mine Ventilation & Safety"],
+    },
+    "Marine & Ocean": {
+        "Ocean & Marine Engineering": ["Naval Architecture & Hydrodynamics", "Offshore Structures & Subsea Systems", "Marine Propulsion & Auxiliary Systems", "Autonomous Underwater Vehicles (AUVs)"],
+    },
+    "Nuclear": {
+        "Nuclear Engineering": ["Reactor Physics & Neutronics", "Thermal Hydraulics & Plant Safety", "Radiation Protection & Shielding", "Nuclear Fuel Cycle & Fusion Systems"],
+    },
+    "Agricultural": {
+        "Agricultural & Biosystems": ["Precision Agriculture & Smart Sensors", "Irrigation & Water Resources Engineering", "Farm Machinery & Agricultural Robotics", "Post-Harvest Processing Tech"],
+    },
+    "Textile": {
+        "Textile Engineering": ["Fiber Science & Polymer Tech", "Yarn, Weaving & Knitting Manufacturing", "Technical Textiles & Smart Wearables", "Dyeing, Printing & Finishing Chemistry"],
+    },
+    "Food": {
+        "Food Process Engineering": ["Food Microbiology & Safety (HACCP)", "Thermal & Aseptic Processing", "Food Packaging & Preservation", "Biochemical Separation & Rheology"],
+    },
+    "Energy": {
+        "Energy & Renewable Systems": ["Solar Photovoltaics & Thermal Systems", "Wind Turbine Design & Aerodynamics", "Battery Energy Storage & Fuel Cells", "Smart Grid Integration & Energy Audit"],
+    },
+    "Architectural & Building": {
+        "Building & Architectural Engineering": ["Building Information Modeling (BIM)", "HVAC, Lighting & Building Services", "Sustainable Green Architecture (LEED)", "Building Acoustics & Enclosure Physics"],
+    },
+}
+
+def get_engineering_domains() -> list[str]:
+    """Returns all 18 top-level engineering domains."""
+    return list(ENGINEERING_TAXONOMY_TREE.keys())
+
+def get_subdomains_for_domain(domain_name: str) -> list[str]:
+    """Returns all subdomains under a given engineering domain."""
+    return list(ENGINEERING_TAXONOMY_TREE.get(domain_name, {}).keys())
+
+def get_specializations_for_subdomain(domain_name: str, subdomain_name: str) -> list[str]:
+    """Returns all specializations under a given engineering subdomain."""
+    return ENGINEERING_TAXONOMY_TREE.get(domain_name, {}).get(subdomain_name, [])
+
+def resolve_domain_hierarchy(query: str) -> dict[str, str]:
+    """Maps any role or skill string to its canonical Engineering Domain, Subdomain, and Specialization."""
+    q = query.lower().strip()
+    
+    # 1. Exact or keyword matching across hierarchy
+    for dom, sub_map in ENGINEERING_TAXONOMY_TREE.items():
+        if dom.lower() in q:
+            first_sub = next(iter(sub_map.keys()), "General")
+            return {"domain": dom, "subdomain": first_sub, "specialization": sub_map.get(first_sub, ["Core"])[0]}
+            
+        for sub, specs in sub_map.items():
+            if sub.lower() in q:
+                return {"domain": dom, "subdomain": sub, "specialization": specs[0] if specs else sub}
+            for sp in specs:
+                if sp.lower() in q or q in sp.lower():
+                    return {"domain": dom, "subdomain": sub, "specialization": sp}
+
+    # Keyword heuristics for primary domains
+    if any(k in q for k in ["embed", "firmware", "mcu", "arm", "rtos", "vlsi", "fpga", "power system", "telecom", "circuit"]):
+        return {"domain": "Electronics & Electrical", "subdomain": "Embedded Systems" if "embed" in q else "VLSI", "specialization": "Embedded Firmware"}
+    if any(k in q for k in ["robot", "autonom", "slam", "ros", "automotive", "car", "vehicle", "cad", "cam", "cnc", "mechatronic"]):
+        return {"domain": "Mechanical", "subdomain": "Robotics" if "robot" in q else "Automotive", "specialization": "Robotics & Control"}
+    if any(k in q for k in ["civil", "structur", "concrete", "steel", "bridge", "traffic", "highway", "geotech", "soil", "construct"]):
+        return {"domain": "Civil & Infrastructure", "subdomain": "Structural" if "struct" in q else "Construction", "specialization": "Structural Engineering"}
+    if any(k in q for k in ["aero", "space", "flight", "rocket", "orbit", "avionics"]):
+        return {"domain": "Aerospace & Space", "subdomain": "Aerospace Engineering", "specialization": "Avionics & Spacecraft"}
+    if any(k in q for k in ["biomed", "biotech", "medical", "neural", "biomechanic"]):
+        return {"domain": "Biomedical & Biotechnology", "subdomain": "Biomedical Engineering", "specialization": "Biomedical Devices"}
+    if any(k in q for k in ["chemical", "thermo", "reactor", "catalysis", "distill"]):
+        return {"domain": "Chemical & Process", "subdomain": "Process Engineering", "specialization": "Process Engineering"}
+    if any(k in q for k in ["solar", "wind", "energy", "battery", "grid"]):
+        return {"domain": "Energy", "subdomain": "Energy & Renewable Systems", "specialization": "Solar & Storage"}
+
+    return {"domain": "Computer & IT", "subdomain": "Artificial Intelligence", "specialization": "Machine Learning"}
 
 # ---------------------------------------------------------------------------
 # 1. Comprehensive Multi-Domain Knowledge Taxonomy
@@ -71,6 +200,13 @@ TAXONOMY_DOMAINS: list[str] = [
     "NLP, Attention & Transformers",
     "Generative AI, RAG & LLMs",
     "MLOps, APIs & Cloud Deployment",
+    "Embedded Systems & Low-Level Programming",
+    "Microcontrollers & Hardware Interfacing",
+    "Real-Time Operating Systems (RTOS)",
+    "Cybersecurity & Network Defense",
+    "Cloud Infrastructure, DevOps & SRE",
+    "Robotics, Kinematics & Control Systems",
+    "Mobile Application Development",
 ]
 
 TAXONOMY_TOPICS: list[TopicDefinition] = [
@@ -389,6 +525,224 @@ TAXONOMY_TOPICS: list[TopicDefinition] = [
         key_concepts=["MLflow tracking", "Data versioning (DVC)", "Model registry lifecycle", "Automated model validation tests"],
         benchmark_mastery=70,
     ),
+
+    # 9. Embedded Systems & Low-Level Programming (Domain 9)
+    TopicDefinition(
+        id="top-emb-c-pointers",
+        title="Embedded C, Memory Layout & Pointer Arithmetic",
+        skill_id="sk-emb-c",
+        skill_name="Embedded C/C++ Programming",
+        domain="Embedded Systems & Low-Level Programming",
+        difficulty="Beginner",
+        estimated_hours=10.0,
+        prerequisites=[],
+        key_concepts=["Stack vs Heap vs Flash", "Volatile keyword & Bitwise operations", "Struct packing & Alignment", "Direct memory access with pointers"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-emb-mcu-arch",
+        title="ARM Cortex-M Architecture, Registers & Interrupts",
+        skill_id="sk-emb-mcu",
+        skill_name="Microcontroller Architecture",
+        domain="Embedded Systems & Low-Level Programming",
+        difficulty="Intermediate",
+        estimated_hours=12.0,
+        prerequisites=["top-emb-c-pointers"],
+        key_concepts=["Memory-mapped I/O", "Nested Vectored Interrupt Controller (NVIC)", "Clock trees & Power modes", "Boot sequence & Linker scripts"],
+        benchmark_mastery=80,
+    ),
+
+    # 10. Microcontrollers & Hardware Interfacing (Domain 10)
+    TopicDefinition(
+        id="top-emb-protocols",
+        title="Hardware Communication Buses (I2C, SPI, UART, CAN)",
+        skill_id="sk-emb-protocols",
+        skill_name="Hardware Protocols & Interfacing",
+        domain="Microcontrollers & Hardware Interfacing",
+        difficulty="Intermediate",
+        estimated_hours=10.0,
+        prerequisites=["top-emb-mcu-arch"],
+        key_concepts=["Timing diagrams & Clock polarity", "I2C master/slave addressing", "SPI high-speed DMA transfers", "CAN bus arbitration & Error handling"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-emb-peripherals",
+        title="ADC, PWM, Timers & Sensor Interfacing",
+        skill_id="sk-emb-peripherals",
+        skill_name="Peripheral Interfacing",
+        domain="Microcontrollers & Hardware Interfacing",
+        difficulty="Intermediate",
+        estimated_hours=10.0,
+        prerequisites=["top-emb-protocols"],
+        key_concepts=["Timer prescalers & Input capture", "PWM motor & LED control", "ADC sampling & Anti-aliasing", "Oscilloscope & Logic analyzer debugging"],
+        benchmark_mastery=80,
+    ),
+
+    # 11. Real-Time Operating Systems (RTOS) & Drivers (Domain 11)
+    TopicDefinition(
+        id="top-emb-rtos",
+        title="FreeRTOS Multitasking, Semaphores & Queues",
+        skill_id="sk-emb-rtos",
+        skill_name="Real-Time Operating Systems (RTOS)",
+        domain="Real-Time Operating Systems (RTOS)",
+        difficulty="Advanced",
+        estimated_hours=14.0,
+        prerequisites=["top-emb-mcu-arch"],
+        key_concepts=["Preemptive task scheduling", "Mutexes, Semaphores & Priority Inversion", "Message queues & Event groups", "Deterministic hard real-time constraints"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-emb-linux-drivers",
+        title="Embedded Linux, Device Tree & Kernel Drivers",
+        skill_id="sk-emb-linux",
+        skill_name="Embedded Linux & Drivers",
+        domain="Real-Time Operating Systems (RTOS)",
+        difficulty="Advanced",
+        estimated_hours=16.0,
+        prerequisites=["top-emb-rtos"],
+        key_concepts=["Yocto / Buildroot rootfs", "Character device drivers", "Device Tree bindings (.dts)", "U-Boot bootloader customization"],
+        benchmark_mastery=75,
+    ),
+
+    # 12. Cybersecurity & Network Defense (Domain 12)
+    TopicDefinition(
+        id="top-sec-net-found",
+        title="Network Protocols, Packet Analysis & Wireshark",
+        skill_id="sk-sec-net",
+        skill_name="Network Security",
+        domain="Cybersecurity & Network Defense",
+        difficulty="Beginner",
+        estimated_hours=10.0,
+        prerequisites=[],
+        key_concepts=["TCP/IP 4-way handshake", "DNS, DHCP & ARP spoofing", "Wireshark packet filtering", "Firewalls & Port scanning with Nmap"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-sec-crypto",
+        title="Applied Cryptography, PKI, Hashes & TLS",
+        skill_id="sk-sec-crypto",
+        skill_name="Applied Cryptography",
+        domain="Cybersecurity & Network Defense",
+        difficulty="Intermediate",
+        estimated_hours=10.0,
+        prerequisites=["top-sec-net-found"],
+        key_concepts=["Symmetric (AES) vs Asymmetric (RSA/ECC)", "SHA-256 & Salted hashing", "Digital certificates & X.509 PKI", "TLS 1.3 key exchange"],
+        benchmark_mastery=80,
+    ),
+    TopicDefinition(
+        id="top-sec-web-pentest",
+        title="Web Application Security & OWASP Top 10",
+        skill_id="sk-sec-pentest",
+        skill_name="Ethical Hacking & Penetration Testing",
+        domain="Cybersecurity & Network Defense",
+        difficulty="Advanced",
+        estimated_hours=14.0,
+        prerequisites=["top-sec-crypto"],
+        key_concepts=["SQL Injection (SQLi) & XSS", "CSRF & SSRF exploitation", "Burp Suite intercepting proxy", "Authentication bypass & Broken access control"],
+        benchmark_mastery=85,
+    ),
+
+    # 13. Cloud Infrastructure, DevOps & SRE (Domain 13)
+    TopicDefinition(
+        id="top-ops-linux-sys",
+        title="Linux Systems Administration, Shell & Networking",
+        skill_id="sk-ops-linux",
+        skill_name="Linux Systems Administration",
+        domain="Cloud Infrastructure, DevOps & SRE",
+        difficulty="Beginner",
+        estimated_hours=10.0,
+        prerequisites=[],
+        key_concepts=["Process management (ps, top, systemd)", "File permissions (chmod, chown)", "Bash scripting & Cron automation", "SSH key authentication & iptables"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-ops-k8s",
+        title="Kubernetes Architecture, Pods & Helm Charts",
+        skill_id="sk-ops-k8s",
+        skill_name="Kubernetes & Container Orchestration",
+        domain="Cloud Infrastructure, DevOps & SRE",
+        difficulty="Advanced",
+        estimated_hours=14.0,
+        prerequisites=["top-ops-linux-sys", "top-mlops-docker"],
+        key_concepts=["Pods, Deployments & Services", "Ingress controllers & TLS", "ConfigMaps & Secrets", "Helm chart package management"],
+        benchmark_mastery=80,
+    ),
+    TopicDefinition(
+        id="top-ops-iac-tf",
+        title="Infrastructure as Code (IaC) with Terraform & AWS",
+        skill_id="sk-ops-iac",
+        skill_name="Infrastructure as Code",
+        domain="Cloud Infrastructure, DevOps & SRE",
+        difficulty="Advanced",
+        estimated_hours=12.0,
+        prerequisites=["top-ops-k8s"],
+        key_concepts=["Terraform HCL syntax & State locking", "AWS VPC, EC2, IAM & S3 modules", "Multi-environment provisioning", "CI/CD automated plan/apply with GitHub Actions"],
+        benchmark_mastery=80,
+    ),
+
+    # 14. Robotics, Kinematics & Control Systems (Domain 14)
+    TopicDefinition(
+        id="top-rob-ros2",
+        title="ROS2 Core Architecture, Nodes, Topics & Services",
+        skill_id="sk-rob-ros",
+        skill_name="ROS/ROS2 Framework",
+        domain="Robotics, Kinematics & Control Systems",
+        difficulty="Beginner",
+        estimated_hours=12.0,
+        prerequisites=[],
+        key_concepts=["DDS communication middleware", "Publishers, Subscribers & Services", "ROS2 Actions & Custom messages", "Launch files & Parameter management"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-rob-kinematics",
+        title="Robot Kinematics, Coordinate Transforms (TF2) & URDF",
+        skill_id="sk-rob-kinematics",
+        skill_name="Robot Kinematics & Modeling",
+        domain="Robotics, Kinematics & Control Systems",
+        difficulty="Intermediate",
+        estimated_hours=12.0,
+        prerequisites=["top-rob-ros2", "top-math-la-matrices"],
+        key_concepts=["Forward & Inverse Kinematics (DH parameters)", "TF2 transform tree & Quaternions", "URDF / Xacro robot modeling", "Gazebo physics simulation"],
+        benchmark_mastery=80,
+    ),
+    TopicDefinition(
+        id="top-rob-slam",
+        title="Sensor Fusion, SLAM & Autonomous Navigation",
+        skill_id="sk-rob-nav",
+        skill_name="SLAM & Autonomous Navigation",
+        domain="Robotics, Kinematics & Control Systems",
+        difficulty="Advanced",
+        estimated_hours=16.0,
+        prerequisites=["top-rob-kinematics"],
+        key_concepts=["LiDAR & IMU sensor fusion (Extended Kalman Filter)", "2D/3D SLAM mapping (Cartographer)", "Nav2 costmaps & Global/Local path planners", "Obstacle avoidance & Recovery behaviors"],
+        benchmark_mastery=75,
+    ),
+
+    # 15. Mobile Application Development (Domain 15)
+    TopicDefinition(
+        id="top-mob-swift-kt",
+        title="Native Mobile Architecture: SwiftUI & Jetpack Compose",
+        skill_id="sk-mob-ui",
+        skill_name="Native Mobile UI",
+        domain="Mobile Application Development",
+        difficulty="Beginner",
+        estimated_hours=12.0,
+        prerequisites=[],
+        key_concepts=["Declarative UI state paradigms", "Navigation stacks & Deep linking", "Async networking & JSON decoding", "Lifecycle events & Background tasks"],
+        benchmark_mastery=85,
+    ),
+    TopicDefinition(
+        id="top-mob-offline",
+        title="Offline Data Persistence, SQLite & Architecture Patterns",
+        skill_id="sk-mob-arch",
+        skill_name="Mobile Architecture & Persistence",
+        domain="Mobile Application Development",
+        difficulty="Intermediate",
+        estimated_hours=12.0,
+        prerequisites=["top-mob-swift-kt"],
+        key_concepts=["Room DB (Android) / CoreData / SwiftData (iOS)", "Clean Architecture (MVVM/MVI)", "Repository pattern & Cache synchronization", "Push notifications & App Store deployment"],
+        benchmark_mastery=80,
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -634,6 +988,154 @@ CAREER_ROLES_BASE: list[RoleRequirement] = [
         typical_duration_weeks=16,
         minimum_weekly_hours=8,
     ),
+    RoleRequirement(
+        role_id="embedded-system-engineer",
+        title="Embedded Systems & Firmware Engineer",
+        category="Embedded, Firmware & IoT",
+        description="Develops bare-metal firmware, RTOS-driven multi-threaded embedded applications, device drivers, and low-power IoT hardware interfaces.",
+        core_domains=[
+            "Embedded Systems & Low-Level Programming",
+            "Microcontrollers & Hardware Interfacing",
+            "Real-Time Operating Systems (RTOS)",
+        ],
+        required_skills={
+            "Embedded C/C++ Programming": 90,
+            "Microcontroller Architecture": 85,
+            "Hardware Protocols & Interfacing": 85,
+            "Peripheral Interfacing": 80,
+            "Real-Time Operating Systems (RTOS)": 85,
+            "Embedded Linux & Drivers": 75,
+        },
+        required_topics={
+            "top-emb-c-pointers": 90,
+            "top-emb-mcu-arch": 85,
+            "top-emb-protocols": 85,
+            "top-emb-peripherals": 80,
+            "top-emb-rtos": 85,
+            "top-emb-linux-drivers": 75,
+        },
+        skill_weights={
+            "Embedded Systems & Low-Level Programming": 0.35,
+            "Microcontrollers & Hardware Interfacing": 0.35,
+            "Real-Time Operating Systems (RTOS)": 0.30,
+        },
+        typical_duration_weeks=20,
+        minimum_weekly_hours=10,
+    ),
+    RoleRequirement(
+        role_id="cybersecurity-analyst",
+        title="Cybersecurity & Penetration Testing Specialist",
+        category="Security, Defense & Ethical Hacking",
+        description="Defends networks and applications, audits cryptographic systems, performs ethical vulnerability assessments, and orchestrates incident response.",
+        core_domains=[
+            "Cybersecurity & Network Defense",
+            "Cloud Infrastructure, DevOps & SRE",
+        ],
+        required_skills={
+            "Network Security": 90,
+            "Applied Cryptography": 85,
+            "Ethical Hacking & Penetration Testing": 85,
+            "Linux Systems Administration": 80,
+        },
+        required_topics={
+            "top-sec-net-found": 90,
+            "top-sec-crypto": 85,
+            "top-sec-web-pentest": 85,
+            "top-ops-linux-sys": 80,
+        },
+        skill_weights={
+            "Cybersecurity & Network Defense": 0.70,
+            "Cloud Infrastructure, DevOps & SRE": 0.30,
+        },
+        typical_duration_weeks=18,
+        minimum_weekly_hours=10,
+    ),
+    RoleRequirement(
+        role_id="devops-engineer",
+        title="DevOps & Cloud Platform Engineer",
+        category="Infrastructure, Cloud & SRE",
+        description="Automates resilient cloud infrastructure with Terraform, orchestrates scalable container fleets on Kubernetes, and builds high-velocity CI/CD pipelines.",
+        core_domains=[
+            "Cloud Infrastructure, DevOps & SRE",
+            "MLOps, APIs & Cloud Deployment",
+        ],
+        required_skills={
+            "Linux Systems Administration": 90,
+            "Containerization & Deployment": 85,
+            "Kubernetes & Container Orchestration": 85,
+            "Infrastructure as Code": 85,
+        },
+        required_topics={
+            "top-ops-linux-sys": 90,
+            "top-mlops-docker": 85,
+            "top-ops-k8s": 85,
+            "top-ops-iac-tf": 85,
+        },
+        skill_weights={
+            "Cloud Infrastructure, DevOps & SRE": 0.70,
+            "MLOps, APIs & Cloud Deployment": 0.30,
+        },
+        typical_duration_weeks=18,
+        minimum_weekly_hours=10,
+    ),
+    RoleRequirement(
+        role_id="robotics-engineer",
+        title="Robotics & Autonomous Systems Engineer",
+        category="Robotics, Autonomy & Control",
+        description="Builds autonomous navigation stacks, solves forward/inverse kinematics, models physics in Gazebo, and interfaces real-time sensor fusion with ROS2.",
+        core_domains=[
+            "Robotics, Kinematics & Control Systems",
+            "Embedded Systems & Low-Level Programming",
+            "Applied Mathematics & Statistics",
+        ],
+        required_skills={
+            "ROS/ROS2 Framework": 90,
+            "Robot Kinematics & Modeling": 85,
+            "SLAM & Autonomous Navigation": 80,
+            "Embedded C/C++ Programming": 80,
+            "Linear Algebra": 75,
+        },
+        required_topics={
+            "top-rob-ros2": 90,
+            "top-rob-kinematics": 85,
+            "top-rob-slam": 80,
+            "top-emb-c-pointers": 80,
+            "top-math-la-matrices": 75,
+        },
+        skill_weights={
+            "Robotics, Kinematics & Control Systems": 0.50,
+            "Embedded Systems & Low-Level Programming": 0.30,
+            "Applied Mathematics & Statistics": 0.20,
+        },
+        typical_duration_weeks=22,
+        minimum_weekly_hours=10,
+    ),
+    RoleRequirement(
+        role_id="mobile-developer",
+        title="Mobile Application Engineer (iOS & Android)",
+        category="Mobile & Client Architecture",
+        description="Creates fluid native mobile applications with SwiftUI and Jetpack Compose, architecting offline-first repositories and high-performance client state.",
+        core_domains=[
+            "Mobile Application Development",
+            "Programming & Data Structures",
+        ],
+        required_skills={
+            "Native Mobile UI": 90,
+            "Mobile Architecture & Persistence": 85,
+            "Python Fundamentals": 75,
+        },
+        required_topics={
+            "top-mob-swift-kt": 90,
+            "top-mob-offline": 85,
+            "top-py-oop": 75,
+        },
+        skill_weights={
+            "Mobile Application Development": 0.70,
+            "Programming & Data Structures": 0.30,
+        },
+        typical_duration_weeks=16,
+        minimum_weekly_hours=8,
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -729,13 +1231,107 @@ CURATED_RESOURCES: list[ResourceDefinition] = [
         target_topic_ids=["top-mlops-fastapi", "top-mlops-docker"],
         learning_outcomes=["Build asynchronous model endpoints", "Dockerize Python ML microservices", "Implement production error handlers"],
     ),
+    ResourceDefinition(
+        id="res-emb-c-course",
+        title="Modern Embedded Systems Programming (Miro Samek)",
+        provider="Quantum Leaps / YouTube",
+        type="COURSE",
+        url="https://www.youtube.com/playlist?list=PLPW8O6W-1chwyTzI3BHwBLbGQoPFxPAPM",
+        duration_hours=18.0,
+        difficulty="Intermediate",
+        target_topic_ids=["top-emb-c-pointers", "top-emb-mcu-arch"],
+        learning_outcomes=["Understand ARM Cortex-M architecture", "Write bare-metal register drivers", "Master interrupt servicing and state machines"],
+    ),
+    ResourceDefinition(
+        id="res-freertos-guide",
+        title="FreeRTOS Official Reference Manual & Kernel Guide",
+        provider="FreeRTOS / AWS",
+        type="DOCUMENTATION",
+        url="https://www.freertos.org/Documentation/RTOS_book.html",
+        duration_hours=12.0,
+        difficulty="Advanced",
+        target_topic_ids=["top-emb-rtos"],
+        learning_outcomes=["Master preemptive task scheduling", "Design thread-safe queues and mutexes", "Avoid priority inversion and deadlocks"],
+    ),
+    ResourceDefinition(
+        id="res-sec-owasp",
+        title="OWASP Web Security Testing Guide & Top 10",
+        provider="OWASP Foundation",
+        type="DOCUMENTATION",
+        url="https://owasp.org/www-project-web-security-testing-guide/",
+        duration_hours=14.0,
+        difficulty="Advanced",
+        target_topic_ids=["top-sec-web-pentest", "top-sec-crypto"],
+        learning_outcomes=["Identify SQLi, XSS, and SSRF flaws", "Perform authenticated security audits with Burp Suite", "Implement defense-in-depth authorization"],
+    ),
+    ResourceDefinition(
+        id="res-k8s-docs",
+        title="Kubernetes Official Concepts & Production Architecture",
+        provider="Cloud Native Computing Foundation (CNCF)",
+        type="DOCUMENTATION",
+        url="https://kubernetes.io/docs/concepts/",
+        duration_hours=15.0,
+        difficulty="Advanced",
+        target_topic_ids=["top-ops-k8s", "top-ops-iac-tf"],
+        learning_outcomes=["Deploy production multi-container pods", "Manage Ingress controllers and TLS certificates", "Automate cluster upgrades with Helm"],
+    ),
+    ResourceDefinition(
+        id="res-ros2-docs",
+        title="ROS 2 Official Documentation & Nav2 Navigation Stack",
+        provider="Open Robotics",
+        type="DOCUMENTATION",
+        url="https://docs.ros.org/en/humble/",
+        duration_hours=16.0,
+        difficulty="Intermediate",
+        target_topic_ids=["top-rob-ros2", "top-rob-kinematics", "top-rob-slam"],
+        learning_outcomes=["Architect modular ROS2 nodes and DDS topics", "Build 2D/3D maps with Cartographer SLAM", "Configure Nav2 path planning pipelines"],
+    ),
 ]
 
 
-def find_career_role(role_query: Optional[str]) -> RoleRequirement:
+def get_topic_by_id(topic_id: str) -> Optional[TopicDefinition]:
+    """Finds a topic by ID across static taxonomy and dynamically synthesized cache."""
+    # 1. Static topics
+    for t in TAXONOMY_TOPICS:
+        if t.id == topic_id:
+            return t
+    # 2. Dynamic synthesized topics
+    try:
+        from app.services.ai_curriculum_service import get_synthesized_topic
+        dyn = get_synthesized_topic(topic_id)
+        if dyn:
+            return dyn
+    except Exception:
+        pass
+    return None
+
+
+def get_all_taxonomy_topics() -> list[TopicDefinition]:
+    """Returns combined list of static taxonomy topics and dynamically synthesized topics."""
+    topics = list(TAXONOMY_TOPICS)
+    try:
+        from app.services.ai_curriculum_service import get_all_synthesized_topics
+        topics.extend(get_all_synthesized_topics())
+    except Exception:
+        pass
+    return topics
+
+
+def get_all_taxonomy_resources() -> list[ResourceDefinition]:
+    """Returns combined list of static curated resources and dynamic synthesized resources."""
+    res = list(CURATED_RESOURCES)
+    try:
+        from app.services.ai_curriculum_service import get_all_synthesized_resources
+        res.extend(get_all_synthesized_resources())
+    except Exception:
+        pass
+    return res
+
+
+def find_career_role(role_query: Optional[str], fallback: bool = True) -> Optional[RoleRequirement]:
     """Finds the best matching canonical career role using fuzzy and synonym matching."""
     if not role_query:
-        return CAREER_ROLES_BASE[0]
+        return CAREER_ROLES_BASE[0] if fallback else None
     q = role_query.lower().strip()
 
     # 1. Exact title or role_id match
@@ -743,7 +1339,40 @@ def find_career_role(role_query: Optional[str]) -> RoleRequirement:
         if r.title.lower() == q or r.role_id.lower() == q:
             return r
 
-    # 2. Key phrase & synonym mappings
+    # 2. Check dynamic synthesized role cache
+    try:
+        from app.services.ai_curriculum_service import _SYNTHESIZED_ROLE_CACHE
+        if q in _SYNTHESIZED_ROLE_CACHE:
+            return _SYNTHESIZED_ROLE_CACHE[q]
+    except Exception:
+        pass
+
+    # 3. Key phrase & synonym mappings across all engineering domains
+    if any(k in q for k in ["embed", "firmware", "microcontroller", "arm", "rtos", "iot", "bare metal", "device driver"]):
+        for r in CAREER_ROLES_BASE:
+            if "embedded" in r.role_id:
+                return r
+
+    if any(k in q for k in ["cyber", "security", "infosec", "penetration", "pentest", "soc", "ethical hack", "crypto"]):
+        for r in CAREER_ROLES_BASE:
+            if "cybersecurity" in r.role_id or "security" in r.role_id:
+                return r
+
+    if any(k in q for k in ["devops", "cloud", "sre", "kubernetes", "k8s", "terraform", "infrastructure", "platform engineer"]):
+        for r in CAREER_ROLES_BASE:
+            if "devops" in r.role_id:
+                return r
+
+    if any(k in q for k in ["robot", "autonom", "slam", "ros", "kinematic", "drone", "uav"]):
+        for r in CAREER_ROLES_BASE:
+            if "robotics" in r.role_id:
+                return r
+
+    if any(k in q for k in ["mobile", "ios", "android", "swift", "kotlin", "flutter", "react native"]):
+        for r in CAREER_ROLES_BASE:
+            if "mobile" in r.role_id:
+                return r
+
     if any(k in q for k in ["data scien", "data scientist", "data-scientist", "analytics", "statistician"]):
         for r in CAREER_ROLES_BASE:
             if "data scientist" in r.title.lower():
@@ -759,24 +1388,43 @@ def find_career_role(role_query: Optional[str]) -> RoleRequirement:
             if "nlp" in r.title.lower():
                 return r
 
-    if any(k in q for k in ["full stack", "fullstack", "web developer", "ai developer", "software engineer"]):
+    if any(k in q for k in ["full stack", "fullstack", "web developer", "frontend developer", "backend developer", "mern", "mean stack"]):
         for r in CAREER_ROLES_BASE:
             if "full stack" in r.title.lower():
                 return r
 
-    if any(k in q for k in ["data engineer", "etl", "big data", "spark", "pipeline engineer"]):
+    if any(k in q for k in ["data engineer", "etl engineer", "big data engineer", "spark engineer", "pipeline engineer"]):
         for r in CAREER_ROLES_BASE:
             if "data engineer" in r.title.lower():
                 return r
 
-    if any(k in q for k in ["machine learning", "ml engineer", "mlops", "deep learning"]):
+    if any(k in q for k in ["machine learning engineer", "ml engineer", "mlops engineer", "deep learning engineer"]):
         for r in CAREER_ROLES_BASE:
             if "machine learning" in r.title.lower():
                 return r
 
-    # 3. Substring match fallback
+    # 4. Substring match for full title
     for r in CAREER_ROLES_BASE:
-        if r.title.lower() in q or q in r.title.lower():
+        if r.title.lower() in q:
             return r
 
+    return CAREER_ROLES_BASE[0] if fallback else None
+
+
+async def find_or_synthesize_career_role(role_query: Optional[str]) -> RoleRequirement:
+    """Finds matching role or synthesizes a new one dynamically via AI LLM."""
+    matched = find_career_role(role_query, fallback=False)
+    if matched:
+        return matched
+
+    if role_query:
+        try:
+            from app.services.ai_curriculum_service import synthesize_dynamic_career_role
+            syn = await synthesize_dynamic_career_role(role_query)
+            if syn:
+                return syn
+        except Exception as e:
+            pass
+
     return CAREER_ROLES_BASE[0]
+

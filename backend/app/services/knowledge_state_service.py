@@ -54,6 +54,9 @@ class LearnerKnowledgeProfile(BaseModel):
     overall_confidence: float
     topics: dict[str, TopicKnowledgeState]  # topic_id -> TopicKnowledgeState
     domain_masteries: dict[str, int]  # domain -> average mastery
+    engineering_domain: Optional[str] = "Computer & IT"
+    subdomain_masteries: dict[str, int] = Field(default_factory=dict)
+    domain_hierarchy: dict[str, Any] = Field(default_factory=dict)
     updated_at: str
 
 # In-Memory Cache for fast query response
@@ -240,17 +243,38 @@ async def build_learner_knowledge_profile(user_id: str) -> LearnerKnowledgeProfi
     avg_conf = round(sum(t.confidence for t in known_topics) / max(1, len(known_topics)), 2) if known_topics else 0.0
     coverage_pct = round((len(known_topics) / max(1, len(topics_list))) * 100)
     
-    # Compute average mastery per domain (only counting topics with evidence)
+    from app.core.knowledge_taxonomy import ENGINEERING_TAXONOMY_TREE, resolve_domain_hierarchy
+    
+    # Compute average mastery per domain and per subdomain
     domain_map: dict[str, list[int]] = {}
+    subdomain_map: dict[str, list[int]] = {}
+
     for t in topics_list:
-        if t.domain not in domain_map:
-            domain_map[t.domain] = []
+        h = resolve_domain_hierarchy(f"{t.domain} {t.topic_title} {t.skill_name}")
+        eng_dom = h.get("domain", "Computer & IT")
+        sub_dom = h.get("subdomain", "Core")
+
+        if eng_dom not in domain_map:
+            domain_map[eng_dom] = []
+        if sub_dom not in subdomain_map:
+            subdomain_map[sub_dom] = []
+
         if t.status != "UNKNOWN":
-            domain_map[t.domain].append(t.mastery)
+            domain_map[eng_dom].append(t.mastery)
+            subdomain_map[sub_dom].append(t.mastery)
             
     domain_masteries: dict[str, int] = {}
     for d, vals in domain_map.items():
         domain_masteries[d] = round(sum(vals) / len(vals)) if vals else 0
+
+    subdomain_masteries: dict[str, int] = {}
+    for sd, vals in subdomain_map.items():
+        subdomain_masteries[sd] = round(sum(vals) / len(vals)) if vals else 0
+
+    # Determine primary engineering domain from top tracked masteries
+    primary_eng_domain = "Computer & IT"
+    if domain_masteries:
+        primary_eng_domain = max(domain_masteries, key=domain_masteries.get)
 
     return LearnerKnowledgeProfile(
         user_id=valid_uid,
@@ -262,5 +286,8 @@ async def build_learner_knowledge_profile(user_id: str) -> LearnerKnowledgeProfi
         overall_confidence=avg_conf,
         topics=states,
         domain_masteries=domain_masteries,
+        engineering_domain=primary_eng_domain,
+        subdomain_masteries=subdomain_masteries,
+        domain_hierarchy=ENGINEERING_TAXONOMY_TREE,
         updated_at=datetime.now(timezone.utc).isoformat(),
     )

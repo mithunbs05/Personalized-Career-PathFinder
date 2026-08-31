@@ -357,6 +357,7 @@ export const Dashboard: React.FC = () => {
                   <StageDetailsPanel
                     stage={stageDetail}
                     overview={overview}
+                    targetRole={overview?.target_role || user?.profile?.targetGoal}
                     isLoading={isLoadingStage}
                     onSelectStage={(id) => setSelectedStageId(id)}
                     onStartStage={handleStartStage}
@@ -369,6 +370,8 @@ export const Dashboard: React.FC = () => {
             </div>
           ) : activeTab === 'skills' ? (
             <SkillMatrix 
+              targetRole={overview?.target_role || user?.profile?.targetGoal}
+              overview={overview}
               onNavigateToMentor={handleNavigateToMentor}
               onNavigateToRoadmap={() => setActiveTab('roadmap')}
             />
@@ -381,7 +384,11 @@ export const Dashboard: React.FC = () => {
               onNavigate={setActiveTab}
             />
           ) : activeTab === 'practice' ? (
-            <MultiModalTransformer initialStageId={selectedStageId || overview?.current_stage?.id || 1} />
+            <MultiModalTransformer 
+              initialStageId={selectedStageId || overview?.current_stage?.id || 1} 
+              targetRole={overview?.target_role || user?.profile?.targetGoal}
+              overview={overview}
+            />
           ) : activeTab === 'profile' ? (
             <LearnerProfileTab overview={overview} onNavigateTab={setActiveTab} />
           ) : null}

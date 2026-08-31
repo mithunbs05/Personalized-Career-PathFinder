@@ -48,7 +48,7 @@ export const VideoCourseMode: React.FC<VideoCourseModeProps> = ({
   // Real backend hook for Lesson Chat (Context-aware Q&A)
   const { messages, isThinking, sendMessage } = useLessonChat(module.id);
 
-  // Derive dynamic timeline from backend transcripts
+  // Derive dynamic timeline from backend transcripts or module chapters
   const timelineItems = transcripts.length > 0
     ? transcripts.map(t => ({
         time: t.timestamp,
@@ -56,32 +56,19 @@ export const VideoCourseMode: React.FC<VideoCourseModeProps> = ({
         concept: t.concept,
         text: t.content
       }))
-    : [
-        {
-          time: '00:15',
-          seconds: 15,
-          concept: 'for loops',
-          text: 'Welcome to this module on Python loops. Unlike traditional C-style loops with counter increments, Python treats loops as first-class sequence traversals.'
-        },
-        {
-          time: '02:30',
-          seconds: 150,
-          concept: 'conditional accumulation',
-          text: "When filtering data during iteration, we test each item against a predicate. For instance, testing for even numbers using 'num % 2 == 0'."
-        },
-        {
-          time: '05:50',
-          seconds: 350,
-          concept: 'iterators',
-          text: 'Notice the accumulator pattern: initialize your result sum before entering the loop, then accumulate only matching values.'
-        },
-        {
-          time: '09:00',
-          seconds: 540,
-          concept: 'list comprehension',
-          text: "Now, let's transition straight into the interactive coding challenge to write this logic and verify all edge cases!"
-        }
-      ];
+    : module.chapters && module.chapters.length > 0
+      ? module.chapters.map((ch, idx) => ({
+          time: `0${Math.floor(ch.startTime / 60)}:${(ch.startTime % 60).toString().padStart(2, '0')}`,
+          seconds: ch.startTime || 15,
+          concept: ch.title,
+          text: ch.transcript
+        }))
+      : (module.objectives || []).map((obj, idx) => ({
+          time: `0${idx * 3}:00`,
+          seconds: idx * 180,
+          concept: `Concept ${idx + 1}`,
+          text: obj
+        }));
 
   const handleTimelineClick = (idx: number, seconds: number) => {
     setSelectedTimelineIndex(idx);
@@ -105,16 +92,7 @@ export const VideoCourseMode: React.FC<VideoCourseModeProps> = ({
     sendMessage(query);
   };
 
-  const codeDemoSnippet = content?.codeDemo?.[0]?.code || `# Python Loop & Even Accumulator Pattern
-def sum_even_numbers(numbers):
-    """Iterates through numbers, checks for parity, and accumulates evens."""
-    total = 0
-    for num in numbers:
-        if num % 2 == 0:
-            total += num
-    return total
-
-# Example: [1, 2, 3, 4, 5, 6] -> 12`;
+  const codeDemoSnippet = content?.codeDemo?.[0]?.code || module.chapters?.[0]?.codeDemo || module.challenge?.starterCode || `// Interactive Demo for ${module.title}\n// Follow along with the video lesson and challenge.`;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

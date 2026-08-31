@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LearningMode,
   TransformerModule,
   LearnerProgress,
   TRANSFORMER_MODULES,
+  getModulesForRole,
   createInitialProgress
 } from './transformerData';
 import { TransformerHeader } from './TransformerHeader';
@@ -15,12 +16,26 @@ import { transformModule } from '../../api/modules.api';
 
 interface MultiModalTransformerProps {
   initialStageId?: number;
+  targetRole?: string;
+  overview?: any;
 }
 
-export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ initialStageId }) => {
-  const initialModule = (initialStageId
-    ? TRANSFORMER_MODULES.find((m) => m.stageId === initialStageId)
-    : TRANSFORMER_MODULES[0]) || TRANSFORMER_MODULES[0];
+export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({
+  initialStageId,
+  targetRole,
+  overview,
+}) => {
+  const roleModules = useMemo(() => {
+    return getModulesForRole(targetRole || overview?.target_role, overview?.stages);
+  }, [targetRole, overview]);
+
+  const initialModule = useMemo(() => {
+    if (initialStageId) {
+      const match = roleModules.find((m) => m.stageId === initialStageId);
+      if (match) return match;
+    }
+    return roleModules[0] || TRANSFORMER_MODULES[0];
+  }, [roleModules, initialStageId]);
 
   const [currentModule, setCurrentModule] = useState<TransformerModule>(initialModule);
   const [currentMode, setCurrentMode] = useState<LearningMode>('video');
@@ -33,31 +48,16 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
   // Local state initialized and synced with real backend data
   const [localProgress, setLocalProgress] = useState<LearnerProgress>(() => createInitialProgress(initialModule));
 
+  // Sync current module if roleModules change
   useEffect(() => {
-    if (backendProg) {
-      setLocalProgress((prev) => ({
-        ...prev,
-        conceptScore: backendProg.concept || prev.conceptScore,
-        practiceScore: backendProg.practice?.passed
-          ? Math.round((backendProg.practice.passed / (backendProg.practice.total || 5)) * 100)
-          : prev.practiceScore,
-        testsPassed: backendProg.practice?.passed ?? prev.testsPassed,
-        totalTests: backendProg.practice?.total ?? prev.totalTests,
-        masteryLevel: (backendProg.mastery as any) || prev.masteryLevel,
-        videoTimePosition: backendProg.videoCurrentTime ?? prev.videoTimePosition,
-        writtenCode: backendProg.savedDraftCode || prev.writtenCode
-      }));
+    const match = initialStageId
+      ? roleModules.find((m) => m.stageId === initialStageId)
+      : roleModules[0];
+    if (match) {
+      setCurrentModule(match);
+      setLocalProgress(createInitialProgress(match));
     }
-  }, [backendProg]);
-
-  useEffect(() => {
-    if (initialStageId) {
-      const match = TRANSFORMER_MODULES.find((m) => m.stageId === initialStageId);
-      if (match && match.id !== currentModule.id) {
-        setCurrentModule(match);
-      }
-    }
-  }, [initialStageId]);
+  }, [roleModules, initialStageId]);
 
   const handleUpdateProgress = (update: Partial<LearnerProgress>) => {
     setLocalProgress((prev) => ({
@@ -111,6 +111,7 @@ export const MultiModalTransformer: React.FC<MultiModalTransformerProps> = ({ in
       <TransformerHeader
         currentModule={currentModule}
         onSelectModule={handleSelectModule}
+        availableModules={roleModules}
         currentMode={currentMode}
         onToggleMode={handleToggleMode}
         progress={localProgress}

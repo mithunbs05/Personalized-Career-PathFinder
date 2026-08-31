@@ -87,7 +87,9 @@ def _build_gap_plan(
     gap_type: str,
 ) -> tuple[list[GapFillingPlanItem], str]:
     """Synthesizes step-by-step actionable learning steps and completion criteria."""
-    matching_res = next((r for r in CURATED_RESOURCES if topic.id in r.target_topic_ids), None)
+    from app.core.knowledge_taxonomy import get_all_taxonomy_resources
+    all_res = get_all_taxonomy_resources()
+    matching_res = next((r for r in all_res if topic.id in r.target_topic_ids), None)
     
     plan: list[GapFillingPlanItem] = []
     
@@ -134,7 +136,7 @@ async def analyze_learner_gaps(
     states = await get_or_init_knowledge_state(user_id)
     
     # Find role requirement definition
-    from app.core.knowledge_taxonomy import find_career_role
+    from app.core.knowledge_taxonomy import find_career_role, get_topic_by_id, get_all_taxonomy_topics
     role_def = find_career_role(target_role_title)
 
     gaps: list[CompetencyGapItem] = []
@@ -144,16 +146,18 @@ async def analyze_learner_gaps(
     developing_cnt = 0
     unknown_cnt = 0
 
+    all_topics = get_all_taxonomy_topics()
+
     # Build downstream dependency lookup for prerequisite blocking detection
     dependents_map: dict[str, list[str]] = {}
-    for top in TAXONOMY_TOPICS:
+    for top in all_topics:
         for prereq_id in top.prerequisites:
             if prereq_id not in dependents_map:
                 dependents_map[prereq_id] = []
             dependents_map[prereq_id].append(top.title)
 
     for top_id, req_mastery in role_def.required_topics.items():
-        top_def = next((t for t in TAXONOMY_TOPICS if t.id == top_id), None)
+        top_def = get_topic_by_id(top_id)
         if not top_def:
             continue
             

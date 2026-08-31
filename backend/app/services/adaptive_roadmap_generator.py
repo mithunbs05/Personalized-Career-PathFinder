@@ -125,35 +125,42 @@ async def generate_personalized_roadmap(
     current_version = _ROADMAP_VERSION_TRACKER[user_id]
 
     states = await get_or_init_knowledge_state(user_id)
-    gap_analysis = await analyze_learner_gaps(user_id, target_role_title)
     
-    from app.core.knowledge_taxonomy import find_career_role
-    role_def = find_career_role(target_role_title)
+    from app.core.knowledge_taxonomy import (
+        find_or_synthesize_career_role,
+        get_topic_by_id,
+        get_all_taxonomy_resources,
+    )
+    
+    # 1. Resolve role from canonical base, cache, or dynamically synthesize via AI
+    role_def = await find_or_synthesize_career_role(target_role_title)
+
+    gap_analysis = await analyze_learner_gaps(user_id, role_def.title)
 
     # Group role-required topics by domain to form coherent curriculum stages
     domain_topic_map: dict[str, list[TopicDefinition]] = {}
     for top_id in role_def.required_topics:
-        top_def = next((t for t in TAXONOMY_TOPICS if t.id == top_id), None)
+        top_def = get_topic_by_id(top_id)
         if top_def:
             if top_def.domain not in domain_topic_map:
                 domain_topic_map[top_def.domain] = []
             domain_topic_map[top_def.domain].append(top_def)
 
-    # Order domains pedagogically
-    domain_order = [
-        "Programming & Data Structures",
-        "Applied Mathematics & Statistics",
-        "Data Wrangling & Feature Engineering",
-        "Machine Learning Foundations",
-        "Deep Learning & Neural Networks",
-        "NLP, Attention & Transformers",
-        "Generative AI, RAG & LLMs",
-        "MLOps, APIs & Cloud Deployment",
-    ]
+    # Order domains pedagogically using the role's core_domains sequence + any remaining
+    domain_order: list[str] = []
+    if role_def.core_domains:
+        for cd in role_def.core_domains:
+            if cd not in domain_order:
+                domain_order.append(cd)
+    for dom in domain_topic_map:
+        if dom not in domain_order:
+            domain_order.append(dom)
 
     stages: list[PersonalizedRoadmapStage] = []
     stage_idx = 1
     completed_stage_titles: set[str] = set()
+
+    all_resources = get_all_taxonomy_resources()
 
     for dom in domain_order:
         if dom not in domain_topic_map:
@@ -213,7 +220,7 @@ async def generate_personalized_roadmap(
 
         # Find verified curated resources for this stage
         stage_resources: list[PersonalizedRoadmapResource] = []
-        for r in CURATED_RESOURCES:
+        for r in all_resources:
             if any(tid in [t.id for t in topics_in_domain] for tid in r.target_topic_ids):
                 stage_resources.append(PersonalizedRoadmapResource(
                     id=r.id,

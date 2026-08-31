@@ -139,10 +139,12 @@ async def get_skill_gaps(
     """Evaluates root-cause topic gaps, prerequisite blockers, and priority gap-filling plans."""
     user = await _get_auth_user(authorization)
     user_prof = await get_user_profile_from_db(user["id"])
-    effective_role = role or "Machine Learning Engineer"
-    if user_prof and user_prof.get("profile_metadata"):
+    effective_role = role
+    if not effective_role and user_prof and user_prof.get("profile_metadata"):
         meta = user_prof["profile_metadata"]
-        effective_role = meta.get("target_goal") or meta.get("target_role") or effective_role
+        effective_role = meta.get("target_goal") or meta.get("target_role")
+    if not effective_role:
+        effective_role = "Machine Learning Engineer"
 
     return await analyze_learner_gaps(user["id"], effective_role)
 

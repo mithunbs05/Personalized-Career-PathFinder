@@ -939,7 +939,7 @@ async def get_roadmap_overview(
         weekly_hours = int(meta.get("weekly_hours", 10) or 10)
         target_months = int(meta.get("target_completion_months", 6) or 6)
         extracted_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or meta.get("job_specialization")
-        if extracted_role:
+        if (not target_role or target_role == "AI/ML Engineer") and extracted_role:
             target_role = extracted_role
 
     # Seed knowledge state from onboarding profile (happens once on first load)
@@ -999,8 +999,8 @@ async def get_roadmap_overview(
         current_stage=current_stage_summary,
         next_stage=next_stage_summary,
         estimated_remaining_weeks=personalized.estimated_remaining_weeks,
-        weekly_hours_budget=weekly_hours,
-        target_timeline_months=target_months,
+        weekly_hours_budget=personalized.weekly_hours_budget,
+        target_timeline_months=personalized.target_timeline_months,
         current_blocker=personalized.current_blocker,
         next_recommended_action=personalized.next_recommended_action,
         stages=stages,
@@ -1014,11 +1014,12 @@ async def get_stage_details(
 ) -> Optional[RoadmapStageDetail]:
     """Returns comprehensive stage details from the pipeline-generated personalized roadmap."""
     
-    # Try to get from pipeline cache first; if not cached, generate
-    if user_id not in _PIPELINE_STAGE_CACHE:
-        await get_roadmap_overview(user_id, "Learner", target_role)
-    
+    # Try to get from pipeline cache first; if not cached or role mismatch, generate
     cached = _PIPELINE_STAGE_CACHE.get(user_id)
+    if not cached or (target_role and target_role != "AI/ML Engineer" and cached.target_role.lower() != target_role.lower()):
+        await get_roadmap_overview(user_id, "Learner", target_role)
+        cached = _PIPELINE_STAGE_CACHE.get(user_id)
+    
     if not cached:
         return None
     
