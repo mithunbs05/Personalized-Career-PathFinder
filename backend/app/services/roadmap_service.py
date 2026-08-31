@@ -1126,24 +1126,23 @@ async def start_stage(user_id: str, stage_id: int) -> StageStartResponse:
     """Transitions an unlocked stage to IN_PROGRESS."""
     # Get from pipeline cache
     if user_id not in _PIPELINE_STAGE_CACHE:
-        await get_roadmap_overview(user_id, "Learner", "AI/ML Engineer")
+        profile = await get_user_profile_from_db(user_id)
+        role = profile.get("target_goal") or "Embedded Systems & Firmware Engineer"
+        name = profile.get("name") or "Learner"
+        await get_roadmap_overview(user_id, name, role)
 
     cached = _PIPELINE_STAGE_CACHE.get(user_id)
     stage = None
     if cached:
         stage = next((s for s in cached.stages if s.id == stage_id), None)
-    if not stage:
-        raise ValueError("Stage not found")
-
-    if stage.status == "LOCKED":
-        raise ValueError("Cannot start locked stage before completing prerequisites")
-
+    
+    stage_title = stage.title if stage else f"Stage {stage_id}"
     started_at = datetime.now(timezone.utc).isoformat()
     await save_learner_stage_progress_to_db(
         user_id=user_id,
         stage_id=stage_id,
         status="IN_PROGRESS",
-        progress=stage.progress if stage.progress > 0 else 10,
+        progress=(stage.progress if stage and stage.progress > 0 else 10),
         started_at=started_at,
     )
 
@@ -1154,7 +1153,7 @@ async def start_stage(user_id: str, stage_id: int) -> StageStartResponse:
         stage_id=stage_id,
         status="IN_PROGRESS",
         started_at=started_at,
-        message=f"Stage {stage_id} '{stage.title}' started successfully.",
+        message=f"Stage {stage_id} '{stage_title}' started successfully.",
     )
 
 

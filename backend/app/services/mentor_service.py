@@ -139,10 +139,75 @@ QUESTION_BANK: dict[str, list[dict[str, Any]]] = {
         {"id": "prob-2", "text": "In a standard normal distribution, what percentage of data falls within ±1 standard deviation of the mean?", "options": ["50%", "68.2%", "95.4%", "99.7%"], "correctAnswer": 1, "explanation": "By the empirical rule (68-95-99.7), approximately 68.2% of data in a normal distribution lies within ±1σ of the mean μ."},
         {"id": "prob-3", "text": "What does Maximum Likelihood Estimation (MLE) aim to maximize?", "options": ["The learning rate", "The probability of observing the given dataset under the model parameters", "The model complexity", "The cross-validation split ratio"], "correctAnswer": 1, "explanation": "MLE seeks parameter values θ that maximize the likelihood function L(θ|X), making the observed data most probable."},
     ],
+    "Embedded C/C++ Programming": [
+        {"id": "emb-1", "text": "Why is the 'volatile' keyword critical when declaring pointers to memory-mapped hardware peripheral registers in C?", "options": ["It increases execution speed", "It prevents the compiler from optimizing away repeated memory reads/writes to hardware", "It allocates the variable on the call stack", "It makes the pointer read-only"], "correctAnswer": 1, "explanation": "The 'volatile' qualifier informs the compiler that the register's value can change asynchronously outside the program flow (e.g., via hardware or interrupts), preventing incorrect optimization."},
+        {"id": "emb-2", "text": "In standard embedded C memory layout, which memory section holds uninitialized global and static variables zeroed at startup?", "options": [".rodata (Flash)", ".bss section (RAM)", "Call Stack", "Heap"], "correctAnswer": 1, "explanation": "The .bss section contains uninitialized global and static variables. The startup assembly routine clears this section in RAM to zero before main() executes."},
+        {"id": "emb-3", "text": "Which bitwise C operation correctly sets Bit 4 of an 8-bit GPIO configuration register without modifying other bits?", "options": ["REG &= ~(1 << 4);", "REG |= (1 << 4);", "REG ^= (1 << 4);", "REG = (1 << 4);"], "correctAnswer": 1, "explanation": "The bitwise OR assignment `REG |= (1 << 4)` sets bit 4 to 1 while leaving all other register bits unchanged."},
+        {"id": "emb-4", "text": "What is the primary risk of performing dynamic memory allocation (malloc/free) inside an Interrupt Service Routine (ISR)?", "options": ["It causes pointer overflow", "It is non-deterministic and can cause deadlocks or unbounded ISR latency", "It changes the CPU clock frequency", "It corrupts the program counter unconditionally"], "correctAnswer": 1, "explanation": "malloc() is non-reentrant and non-deterministic. Calling it inside an ISR can lead to priority inversion, heap corruption, and unacceptable interrupt latency."},
+        {"id": "emb-5", "text": "What does pointer arithmetic `p + 1` evaluate to in C when `p` is of type `uint32_t*`?", "options": ["The address increased by 1 byte", "The address increased by 4 bytes (sizeof(uint32_t))", "The address squared", "The value stored at p plus 1"], "correctAnswer": 1, "explanation": "Pointer arithmetic scales by the size of the referenced type. For uint32_t (4 bytes), `p + 1` advances the memory address by 4 bytes."},
+    ],
+    "ARM Cortex-M Architecture, Registers & Interrupts": [
+        {"id": "arm-1", "text": "What is the function of the NVIC (Nested Vectored Interrupt Controller) in ARM Cortex-M microcontrollers?", "options": ["Dynamic voltage scaling", "Hardware-accelerated low-latency interrupt prioritizing and tail-chaining", "Generating PWM waveforms", "SPI bus arbitration"], "correctAnswer": 1, "explanation": "The NVIC provides deterministic, low-latency interrupt handling with hardware priority nesting and tail-chaining in ARM Cortex-M cores."},
+        {"id": "arm-2", "text": "In ARM Cortex-M, what occurs during automatic hardware 'stacking' upon entering an exception?", "options": ["The core reboots immediately", "Hardware automatically pushes R0-R3, R12, LR, PC, and xPSR onto the active stack", "The Flash memory is locked", "All peripheral clocks are disabled"], "correctAnswer": 1, "explanation": "Upon an interrupt, the ARM Cortex-M hardware automatically saves caller-saved registers (R0-R3, R12, LR, PC, xPSR) to the stack, enabling pure C interrupt handlers."},
+        {"id": "arm-3", "text": "What is the purpose of the SysTick timer in ARM Cortex-M systems?", "options": ["Real-time clock calendar backup", "Providing a standard periodic hardware timebase for RTOS tick scheduling", "Audio signal generation", "Watchdog reset monitoring"], "correctAnswer": 1, "explanation": "SysTick is a 24-bit down-counter integral to ARM Cortex-M cores, designed to generate periodic ticks for RTOS kernels and task schedulers."},
+        {"id": "arm-4", "text": "What does 'Tail-Chaining' optimize in ARM Cortex-M interrupt processing?", "options": ["Optimizes Flash memory programming", "Eliminates unnecessary pop/push unstacking overhead between back-to-back pending interrupts (saving 12+ clock cycles)", "Chains multiple DMA channels together", "Increases CPU clock multiplier"], "correctAnswer": 1, "explanation": "Tail-chaining allows the processor to skip popping registers and immediately service the next pending ISR, reducing interrupt latency."},
+        {"id": "arm-5", "text": "What is the difference between Handler Mode and Thread Mode in ARM Cortex-M?", "options": ["Handler Mode executes exceptions/ISRs with privileged access; Thread Mode runs user application code", "Handler Mode is for battery charging only", "Thread Mode disables all interrupts", "There is no privilege distinction"], "correctAnswer": 0, "explanation": "ARM Cortex-M operates in Thread Mode for main application code and enters Handler Mode (always privileged) whenever executing exception handlers."},
+    ],
+    "Microcontroller Architecture": [
+        {"id": "mc-1", "text": "What is the main architectural difference between Memory-Mapped I/O and Port-Mapped I/O?", "options": ["Memory-mapped I/O shares the same address bus and instructions as system RAM", "Port-mapped I/O cannot control digital pins", "Memory-mapped I/O requires external ROM chips", "Port-mapped I/O runs faster in all cases"], "correctAnswer": 0, "explanation": "In Memory-Mapped I/O, peripheral registers occupy standard memory addresses and are accessed using regular load/store instructions (LDR/STR in ARM)."},
+        {"id": "mc-2", "text": "What is the primary function of a Watchdog Timer (WDT)?", "options": ["To measure external signal frequencies", "To automatically reset the microcontroller if software hangs or enters an infinite fault loop", "To regulate the operating voltage", "To store calibration data"], "correctAnswer": 1, "explanation": "A Watchdog Timer counts down continuously and triggers a system reset unless periodically refreshed ('kicked') by valid software execution."},
+        {"id": "mc-3", "text": "What is the purpose of Direct Memory Access (DMA) in microcontroller systems?", "options": ["To double the CPU clock frequency", "To transfer data between memory and peripherals without continuous CPU intervention, freeing CPU cycles", "To compress Flash firmware", "To encrypt SPI data"], "correctAnswer": 1, "explanation": "DMA controllers transfer data directly between memory and peripherals (e.g. ADC, UART, SPI) in the background without CPU cycle overhead."},
+        {"id": "mc-4", "text": "Why do microcontrollers provide Phase-Locked Loop (PLL) clock circuits?", "options": ["To multiply a low-frequency crystal oscillator up to high internal CPU operating frequencies", "To convert AC voltage to DC", "To store debug logs", "To monitor temperature"], "correctAnswer": 0, "explanation": "PLL circuits multiply and stabilize an external low-cost crystal frequency (e.g. 8MHz) up to high CPU frequencies (e.g. 72MHz or 168MHz)."},
+        {"id": "mc-5", "text": "What is the difference between Push-Pull and Open-Drain output configurations on a GPIO pin?", "options": ["Push-Pull actively drives both HIGH and LOW levels; Open-Drain only actively pulls LOW (requires external pull-up for HIGH)", "Open-Drain cannot drive low", "Push-Pull is only for analog input", "There is no electrical difference"], "correctAnswer": 0, "explanation": "Push-pull uses complementary transistors to drive high and low. Open-drain only sinks current low, making it ideal for shared buses like I2C."},
+    ],
+    "Embedded Systems": [
+        {"id": "es-1", "text": "In FreeRTOS or embedded multitasking, what mechanism prevents race conditions when sharing a buffer between tasks?", "options": ["Infinite while loops", "Mutexes or Semaphores with priority inheritance", "Disabling power saving", "Using global variables without locking"], "correctAnswer": 1, "explanation": "Mutexes with priority inheritance prevent concurrent access races and mitigate priority inversion in real-time operating systems."},
+        {"id": "es-2", "text": "Which serial communication protocol uses a 2-wire bus (SDA and SCL) with open-drain outputs and pull-up resistors?", "options": ["SPI", "UART", "I2C (Inter-Integrated Circuit)", "CAN"], "correctAnswer": 2, "explanation": "I2C operates using two bidirectional open-drain lines (Serial Data SDA and Serial Clock SCL) pulled high by external resistors."},
+        {"id": "es-3", "text": "What is Priority Inversion in real-time operating systems (RTOS)?", "options": ["When a high-priority task is blocked waiting for a shared resource held by a low-priority task that is preempted by medium-priority tasks", "When task priorities are reversed at compile time", "When the CPU clock slows down", "When interrupt handlers are disabled"], "correctAnswer": 0, "explanation": "Priority inversion happens when a medium task preempts a low task holding a mutex needed by a high task. Priority inheritance protocol solves this by elevating the low task's priority."},
+        {"id": "es-4", "text": "What are the 4 standard signal lines in a full-duplex SPI (Serial Peripheral Interface) bus?", "options": ["MOSI, MISO, SCK, CS/SS", "TX, RX, RTS, CTS", "SDA, SCL, VCC, GND", "CAN_H, CAN_L, PWR, GND"], "correctAnswer": 0, "explanation": "SPI uses Master Out Slave In (MOSI), Master In Slave Out (MISO), Serial Clock (SCK), and Chip Select (CS/SS)."},
+        {"id": "es-5", "text": "Why is static task memory allocation (`xTaskCreateStatic`) preferred over dynamic allocation (`xTaskCreate`) in safety-critical firmware?", "options": ["It prevents heap fragmentation and guarantees deterministic stack and TCB memory allocation at compile time", "It uses less Flash memory", "It increases RTOS context switch speed by 10x", "It disables compiler optimizations"], "correctAnswer": 0, "explanation": "Static allocation guarantees at compile-time that memory for task stacks and TCBs is reserved, preventing runtime out-of-memory crashes."},
+    ],
     "Transformers": [
         {"id": "tf-1", "text": "In the self-attention formula Attention(Q, K, V) = softmax(QK^T / √d_k)V, why is the dot product scaled by √d_k?", "options": ["To increase parameter count", "To prevent dot products from growing large in magnitude and pushing softmax into vanishing gradients", "To ensure outputs are binary", "To align dimensions for matrix multiplication"], "correctAnswer": 1, "explanation": "For large projection dimensions d_k, dot products grow large, causing softmax to saturate with extremely tiny gradients. Scaling by √d_k maintains stable variance."},
         {"id": "tf-2", "text": "Why do transformer architectures require Positional Encodings?", "options": ["To compress the input tokens", "Because self-attention is permutation-invariant and has no inherent sense of word order", "To initialize attention weights", "To speed up matrix multiplication on GPUs"], "correctAnswer": 1, "explanation": "Self-attention computes token relationships simultaneously regardless of position. Positional encodings inject sequential order into token embeddings."},
         {"id": "tf-3", "text": "What is the primary benefit of KV (Key-Value) Caching during LLM text generation?", "options": ["It reduces vocabulary size", "It avoids recomputing Key and Value vectors for previously generated prompt and output tokens", "It enables training on smaller GPUs", "It replaces the attention mechanism with convolution"], "correctAnswer": 1, "explanation": "During autoregressive decoding, past tokens' keys and values do not change. Caching them avoids quadratic recomputation per new generated token."},
+        {"id": "tf-4", "text": "What is the key difference between Multi-Head Attention (MHA) and Grouped-Query Attention (GQA)?", "options": ["GQA shares Key and Value heads across multiple Query heads, drastically reducing KV cache memory footprint", "MHA uses fewer parameters than GQA", "GQA cannot run on modern GPUs", "MHA only works for vision models"], "correctAnswer": 0, "explanation": "GQA groups multiple query heads to share a single key/value head, reducing memory bandwidth during autoregressive decoding."},
+        {"id": "tf-5", "text": "What is FlashAttention and how does it speed up transformer training and inference?", "options": ["It quantizes weights to 4-bit integers", "It reorganizes the attention computation into GPU SRAM tiles, avoiding high-latency reads/writes to High Bandwidth Memory (HBM)", "It eliminates backpropagation", "It removes the softmax activation entirely"], "correctAnswer": 1, "explanation": "FlashAttention uses tiling and online softmax to compute exact attention with IO-awareness, drastically speeding up memory transfers."},
+    ],
+    "Frontend Foundations": [
+        {"id": "fs-fe-1", "text": "In JavaScript, what is the key difference between microtasks (Promises, queueMicrotask) and macrotasks (setTimeout, setInterval) in the Event Loop?", "options": ["Microtasks execute before the next macrotask and drain completely before rendering", "Macrotasks execute immediately synchronously", "Microtasks run in a separate Web Worker thread", "There is no functional difference in modern V8 engines"], "correctAnswer": 0, "explanation": "The microtask queue has higher priority than the macrotask queue. After every JS task completes, the engine drains the entire microtask queue before rendering or picking the next macrotask."},
+        {"id": "fs-fe-2", "text": "What is a JavaScript closure?", "options": ["A method to close browser tabs programmatically", "A function bundled together with references to its surrounding lexical state (lexical environment)", "A JSON parsing error handler", "A CSS styling boundary"], "correctAnswer": 1, "explanation": "A closure gives an inner function access to an outer function's scope even after the outer function has finished executing."},
+        {"id": "fs-fe-3", "text": "Which CSS layout property is best suited for 2-dimensional grid systems with rows and columns?", "options": ["CSS Flexbox", "CSS Grid (`display: grid`)", "Float and Clearfix", "Position: fixed"], "correctAnswer": 1, "explanation": "CSS Grid is a 2-dimensional layout system designed for rows and columns simultaneously, whereas Flexbox is primarily 1-dimensional."},
+        {"id": "fs-fe-4", "text": "What does the 'async' attribute on a `<script>` HTML tag do during page load?", "options": ["It executes the script synchronously and blocks DOM parsing", "It downloads the script asynchronously and executes it immediately when ready without blocking HTML parsing", "It defers execution until DOMContentLoaded fires", "It disables JavaScript execution on mobile browsers"], "correctAnswer": 1, "explanation": "'async' fetches the script asynchronously in parallel with HTML parsing and executes it as soon as download completes."},
+        {"id": "fs-fe-5", "text": "In modern ES6+, what does the spread operator `...` do when applied to an object `{ ...user, role: 'admin' }`?", "options": ["Mutates the original user object directly", "Creates a shallow clone of the user object with the role property updated/overridden", "Deletes all properties in user", "Converts the object into an array"], "correctAnswer": 1, "explanation": "Object spread creates a shallow copy of properties from `user` and immutably overrides or appends `role: 'admin'` without mutating the original."},
+    ],
+    "React & State Management": [
+        {"id": "fs-react-1", "text": "In React 18+, why should state updates in useEffect avoid missing dependencies in the dependency array?", "options": ["It causes CSS syntax errors", "It leads to stale closures referencing outdated state/props and creates desynchronized state bugs", "It crashes the Webpack build", "It converts functional components to class components"], "correctAnswer": 1, "explanation": "Omitting dependencies causes the effect closure to capture stale variables from previous renders, leading to bugs and race conditions."},
+        {"id": "fs-react-2", "text": "What is the primary role of React's Virtual DOM and Reconciliation algorithm (Fiber)?", "options": ["To compile JavaScript to WebAssembly", "To compute minimal DOM mutations by diffing tree changes and batching real DOM updates efficiently", "To manage backend database queries", "To encrypt user cookies"], "correctAnswer": 1, "explanation": "The Virtual DOM allows React to calculate tree diffs in memory and batch the minimal set of expensive real DOM mutations."},
+        {"id": "fs-react-3", "text": "When should you use `useCallback` or `useMemo` in a React component?", "options": ["Wrap every single primitive variable and inline function in the app", "To memoize expensive computations or maintain referential equality of callbacks passed to memoized child components", "To perform network API calls", "To trigger re-renders on window resize"], "correctAnswer": 1, "explanation": "useCallback/useMemo prevent unnecessary child re-renders by preserving reference stability of callbacks and memoizing CPU-intensive calculations."},
+        {"id": "fs-react-4", "text": "What is the difference between React Context and dedicated state managers like Redux or Zustand?", "options": ["Context is a dependency injection mechanism that can cause all consuming components to re-render; Redux/Zustand offer granular selector subscriptions and middleware", "Context only works on mobile devices", "Redux is built into the React core package", "Context does not support JavaScript objects"], "correctAnswer": 0, "explanation": "Context triggers re-renders across all consumers when its value changes, whereas Zustand/Redux allow selective component subscriptions to specific slices of state."},
+        {"id": "fs-react-5", "text": "What is the purpose of React Error Boundaries?", "options": ["To catch JavaScript errors anywhere in their child component tree and display a fallback UI instead of crashing the whole app", "To prevent network 500 errors", "To compile TypeScript interfaces", "To encrypt user passwords"], "correctAnswer": 0, "explanation": "Error boundaries are React components that catch JS errors during rendering, lifecycle methods, and constructors of children, rendering a graceful fallback UI."},
+    ],
+    "Node.js & Backend Architecture": [
+        {"id": "fs-node-1", "text": "Why is Node.js described as 'Single-Threaded, Non-Blocking, and Asynchronous'?", "options": ["It can only run on single-core CPUs and cannot handle network traffic", "Its main execution thread processes the Event Loop while delegating I/O operations to OS kernel threads via libuv", "It compiles all code into static machine binaries", "It runs entirely inside the client browser"], "correctAnswer": 1, "explanation": "Node.js runs user JavaScript on a single thread and offloads heavy file/network I/O tasks to libuv worker threads, preventing the main thread from blocking."},
+        {"id": "fs-node-2", "text": "In Express.js middleware, what happens if a middleware function does NOT call `next()` and does NOT send a response (`res.send`)?", "options": ["The server reboots immediately", "The client request hangs indefinitely until connection timeout", "Express throws a 404 error immediately", "The next route handler runs automatically"], "correctAnswer": 1, "explanation": "Express middleware must either end the request-response cycle or invoke `next()` to pass control down the chain; otherwise the request hangs until timeout."},
+        {"id": "fs-node-3", "text": "Which HTTP status code should a REST API return when a resource is successfully created via a POST request?", "options": ["200 OK", "201 Created with Location header", "204 No Content", "304 Not Modified"], "correctAnswer": 1, "explanation": "HTTP 201 Created indicates that the request succeeded and resulted in the creation of a new resource."},
+        {"id": "fs-node-4", "text": "What is CORS (Cross-Origin Resource Sharing) and why does a browser enforce it?", "options": ["A server compression algorithm to speed up downloads", "A browser security mechanism that restricts web pages from making AJAX requests to a different domain unless permitted by server headers", "A database encryption standard", "An authentication protocol replacing OAuth"], "correctAnswer": 1, "explanation": "CORS prevents malicious websites from reading sensitive cross-origin data by enforcing strict HTTP response header checks (`Access-Control-Allow-Origin`)."},
+        {"id": "fs-node-5", "text": "What is the purpose of connection pooling in Node.js backend services connecting to PostgreSQL?", "options": ["To avoid the high TCP handshake and authentication overhead of opening a new DB connection per incoming API request", "To make SQL queries execute in parallel on client devices", "To eliminate the need for SQL passwords", "To convert PostgreSQL into MongoDB"], "correctAnswer": 0, "explanation": "Connection pools maintain an active pool of open database connections that can be borrowed and released rapidly, preventing database saturation and connection lag."},
+    ],
+    "Databases & PostgreSQL": [
+        {"id": "fs-db-1", "text": "In PostgreSQL and relational databases, what does the 'ACID' acronym stand for?", "options": ["Asynchronous, Concurrent, Indexed, Distributed", "Atomicity, Consistency, Isolation, Durability", "Authentication, Compression, Integrity, Decryption", "Allocation, Clustering, Inheritance, Deletion"], "correctAnswer": 1, "explanation": "ACID guarantees reliable database transaction processing: Atomicity (all-or-nothing), Consistency (rules enforced), Isolation (concurrent safety), and Durability (persisted)."},
+        {"id": "fs-db-2", "text": "Why are B-Tree indexes standard for column lookups in PostgreSQL, and when might an index degrade performance?", "options": ["B-Trees are only used for text strings; they never affect write speed", "They provide O(log n) lookup/range searches, but every INSERT/UPDATE/DELETE requires updating index pages, increasing write overhead", "They replace system RAM entirely", "They prevent tables from holding more than 1,000 rows"], "correctAnswer": 1, "explanation": "B-Tree indexes provide fast logarithmic lookups and range scans, but excessive indexes incur write amplification on every insert and update."},
+        {"id": "fs-db-3", "text": "What is the N+1 query problem when using ORMs (like Prisma, TypeORM, or Sequelize)?", "options": ["When a query takes N+1 seconds to run", "When an ORM executes 1 query to fetch a parent list and then executes N separate queries to fetch related child records instead of using a JOIN", "When database connection pools exceed N+1 connections", "When primary keys exceed 32-bit integers"], "correctAnswer": 1, "explanation": "The N+1 problem occurs when fetching N parent rows triggers N additional queries for child relationships rather than batching or using an eager SQL JOIN."},
+        {"id": "fs-db-4", "text": "What is the difference between `INNER JOIN` and `LEFT JOIN` in SQL?", "options": ["INNER JOIN only returns matching rows from both tables; LEFT JOIN returns all rows from the left table and NULLs for non-matching right rows", "LEFT JOIN only returns rows where right table is null", "INNER JOIN runs slower on indexed tables", "There is no difference in modern query planners"], "correctAnswer": 0, "explanation": "An INNER JOIN requires matches in both tables, whereas a LEFT JOIN preserves all rows from the left table regardless of whether matches exist in the right table."},
+        {"id": "fs-db-5", "text": "What is Database Normalization (3NF)?", "options": ["Converting tables into flat single CSV files", "Structuring a relational schema to minimize data redundancy and eliminate insertion, update, and deletion anomalies", "Encrypting database disk partitions", "Partitioning tables across geographic regions"], "correctAnswer": 1, "explanation": "3NF ensures every non-key column depends solely on the primary key, eliminating duplicate data and consistency anomalies."},
+    ],
+    "Full Stack Development": [
+        {"id": "fs-all-1", "text": "Where should sensitive JWT (JSON Web Token) refresh tokens be stored on the client to mitigate XSS (Cross-Site Scripting) token theft?", "options": ["In JavaScript `localStorage`", "In an `HttpOnly`, `Secure`, `SameSite=Strict` HTTP cookie", "In a public URL query parameter", "In a client-side global window variable"], "correctAnswer": 1, "explanation": "HttpOnly cookies cannot be accessed via JavaScript (`document.cookie`), shielding sensitive refresh tokens from malicious XSS script extraction."},
+        {"id": "fs-all-2", "text": "What is the difference between WebSockets and standard HTTP REST polling for real-time applications?", "options": ["WebSockets require reloading the browser page", "WebSockets maintain a persistent, bidirectional, full-duplex TCP connection over a single socket, eliminating HTTP request header overhead", "HTTP polling uses less server bandwidth in all real-time scenarios", "WebSockets cannot transmit JSON data"], "correctAnswer": 1, "explanation": "WebSockets establish a single persistent duplex connection for low-latency bidirectional messaging without HTTP connection handshake overhead per message."},
+        {"id": "fs-all-3", "text": "What is the primary mechanism of CSRF (Cross-Site Request Forgery) attacks, and how do Anti-CSRF tokens defend against them?", "options": ["Malicious sites tricking the user's browser into submitting unauthorized requests with automatic cookies; Anti-CSRF secret tokens validate request origin explicitly", "Intercepting Wi-Fi traffic", "Brute-forcing database passwords", "Injecting SQL commands via input fields"], "correctAnswer": 0, "explanation": "CSRF exploits automatic browser cookie transmission. Unpredictable anti-CSRF tokens passed via custom headers verify that requests originate from legitimate client views."},
+        {"id": "fs-all-4", "text": "What is Docker Containerization in full-stack application deployment?", "options": ["A hardware virtualization system replacing the operating system kernel", "Packaging application code with all dependencies, runtime, and system libraries into an immutable, isolated, reproducible container", "A cloud storage bucket service", "A JavaScript bundler like Webpack"], "correctAnswer": 1, "explanation": "Docker packages code and all dependencies into lightweight isolated containers that run consistently across development, staging, and production environments."},
+        {"id": "fs-all-5", "text": "Why are CDN (Content Delivery Network) edge servers used for frontend asset hosting?", "options": ["They execute server-side Node.js code only", "They cache static assets (HTML, JS, CSS, images) geographically close to end users, reducing latency and TTFB", "They replace backend databases", "They generate SSL certificates automatically without DNS"], "correctAnswer": 1, "explanation": "CDNs distribute static cached assets to edge nodes worldwide, drastically minimizing round-trip network latency for end users."},
     ],
 }
 
@@ -519,13 +584,36 @@ async def generate_assessment_questions(
     - server_questions: contains correctAnswer and explanation (KEPT ON SERVER)
     - client_questions: stripped of answers (SAFE TO RETURN TO CLIENT)
     """
-    # Check if curated bank has questions for this skill
-    bank_questions = QUESTION_BANK.get(focus.skill)
+    # Check if curated bank has questions for this skill or topic (with fuzzy matching)
+    target_bank = QUESTION_BANK.get(focus.skill) or QUESTION_BANK.get(focus.topic)
+
+    if not target_bank:
+        skill_lower = f"{focus.skill} {focus.topic or ''} {focus.domain}".lower()
+        if any(k in skill_lower for k in ["react", "component", "redux", "zustand", "hooks"]):
+            target_bank = QUESTION_BANK.get("React & State Management")
+        elif any(k in skill_lower for k in ["frontend", "javascript", "dom", "html", "css"]):
+            target_bank = QUESTION_BANK.get("Frontend Foundations")
+        elif any(k in skill_lower for k in ["node", "express", "backend", "rest", "api"]):
+            target_bank = QUESTION_BANK.get("Node.js & Backend Architecture")
+        elif any(k in skill_lower for k in ["database", "postgres", "sql", "orm", "prisma"]):
+            target_bank = QUESTION_BANK.get("Databases & PostgreSQL")
+        elif any(k in skill_lower for k in ["full stack", "fullstack", "web app"]):
+            target_bank = QUESTION_BANK.get("Full Stack Development")
+        elif any(k in skill_lower for k in ["embedded c", "pointer", "c/c++", "firmware"]):
+            target_bank = QUESTION_BANK.get("Embedded C/C++ Programming")
+        elif any(k in skill_lower for k in ["arm", "cortex", "nvic", "systick", "interrupt"]):
+            target_bank = QUESTION_BANK.get("ARM Cortex-M Architecture, Registers & Interrupts")
+        elif any(k in skill_lower for k in ["microcontroller", "peripheral", "gpio"]):
+            target_bank = QUESTION_BANK.get("Microcontroller Architecture")
+        elif any(k in skill_lower for k in ["freertos", "rtos", "i2c", "spi"]):
+            target_bank = QUESTION_BANK.get("Embedded Systems")
+        elif any(k in skill_lower for k in ["transformer", "attention", "llm"]):
+            target_bank = QUESTION_BANK.get("Transformers")
 
     server_questions: list[dict[str, Any]] = []
 
-    if bank_questions and len(bank_questions) >= 3:
-        server_questions = bank_questions[:count]
+    if target_bank and len(target_bank) >= 2:
+        server_questions = target_bank[:count]
     else:
         # Generate with LLM if available
         llm = _get_llm(temperature=0.3)
@@ -603,22 +691,30 @@ def grade_assessment(
     server_questions: list[dict[str, Any]],
     user_answers: list[int],
     previous_mastery: int,
+    skill_name: str = "Topic",
+    target_role: str = "Engineer",
 ) -> tuple[int, list[QuestionResult], int, str]:
     """
-    Authoritative server-side grading.
+    Authoritative server-side grading with personalized diagnostic analysis and study recommendations.
     Formula: new_mastery = min(100, round(previous_mastery * 0.4 + score * 0.6))
     """
     total = len(server_questions)
     correct_count = 0
     results: list[QuestionResult] = []
+    missed_concepts: list[str] = []
 
     for idx, q in enumerate(server_questions):
         user_sel = user_answers[idx] if idx < len(user_answers) else -1
         correct_idx = q.get("correctAnswer", 0)
         is_correct = user_sel == correct_idx
+        q_explanation = q.get("explanation", "Review the underlying architectural concepts.")
 
         if is_correct:
             correct_count += 1
+        else:
+            q_text = q.get("text", f"Question {idx+1}")
+            # Extract concept snippet
+            missed_concepts.append(f"• **Q{idx+1}**: {q_explanation}")
 
         results.append(
             QuestionResult(
@@ -626,7 +722,7 @@ def grade_assessment(
                 correct=is_correct,
                 selected_option=user_sel,
                 correct_option=correct_idx,
-                explanation=q.get("explanation", "Correct answer identified."),
+                explanation=q_explanation,
             )
         )
 
@@ -635,12 +731,37 @@ def grade_assessment(
     # Weighted adaptive mastery formula
     new_mastery = min(100, round(previous_mastery * 0.4 + score_percent * 0.6))
 
-    if score_percent >= 80:
-        feedback = f"🎉 Outstanding! You scored {score_percent}% ({correct_count}/{total} correct). Your mastery has increased to {new_mastery}%."
-    elif score_percent >= 50:
-        feedback = f"👍 Good effort! You scored {score_percent}% ({correct_count}/{total} correct). Review the missed concepts to strengthen your score."
+    # Comprehensive Diagnostic Feedback & Study Recommendations
+    if score_percent == 100:
+        feedback = (
+            f"🎉 **Perfect Mastery!** You scored **{score_percent}%** ({correct_count}/{total} correct).\n\n"
+            f"✅ **Verified Strengths:** You demonstrated full competency across all evaluated topics for **{skill_name}**.\n"
+            f"📈 **Progress Update:** Your mastery score has increased to **{new_mastery}%**.\n\n"
+            f"🚀 **Next Recommended Step:** Proceed to the next curriculum milestone to advance your **{target_role}** career path."
+        )
+    elif score_percent >= 60:
+        feedback = (
+            f"👍 **Solid Progress!** You scored **{score_percent}%** ({correct_count}/{total} correct).\n\n"
+            f"📈 **Mastery Update:** Your verified score is now **{new_mastery}%**.\n\n"
+            f"🔍 **Identified Areas for Improvement:**\n"
+            + "\n".join(missed_concepts) + "\n\n"
+            f"📚 **Personalized Study Plan:**\n"
+            f"1. **Targeted Review:** Study the specific edge cases noted above in your curriculum resources.\n"
+            f"2. **Documentation & Architecture:** Revisit register/protocol specifications relevant to **{skill_name}**.\n"
+            f"3. **Re-Assessment:** Retake this assessment once you've reviewed the concepts to push your mastery above 80%."
+        )
     else:
-        feedback = f"📚 Keep practicing! You scored {score_percent}% ({correct_count}/{total} correct). Let's review the fundamental concepts before taking the next quiz."
+        feedback = (
+            f"⚠️ **Assessment Completed — Knowledge Gaps Identified**\n\n"
+            f"Score: **{score_percent}%** ({correct_count}/{total} correct). Current Mastery: **{new_mastery}%**.\n\n"
+            f"🚨 **Where You Are Lacking:**\n"
+            + ("\n".join(missed_concepts) if missed_concepts else "• Foundational principles need review.") + "\n\n"
+            f"📖 **What You Need to Study for {target_role}:**\n"
+            f"1. **Foundational Principles:** Dedicate 1–2 study sessions to core syntax, memory layouts, and protocols for **{skill_name}**.\n"
+            f"2. **Curated Resources:** Open the curated course & documentation linked in this stage's panel.\n"
+            f"3. **Ask AI Mentor:** Use the prompt chips below to ask: *'Explain my weakest skill'* for a step-by-step conceptual walkthrough.\n"
+            f"4. **Re-evaluate:** Retake this assessment to demonstrate evidence and unlock downstream milestones."
+        )
 
     return score_percent, results, new_mastery, feedback
 

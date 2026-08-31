@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   RoadmapStageDetail,
   RoadmapOverviewResponse,
@@ -53,6 +53,47 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
   onCloseSelection,
 }) => {
   const [selectedTopic, setSelectedTopic] = useState<RoadmapTopicItem | null>(null);
+
+  const [localOverrides, setLocalOverrides] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pathai_skill_overrides') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setLocalOverrides(JSON.parse(localStorage.getItem('pathai_skill_overrides') || '{}'));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    handleStorageChange();
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [stage]);
+
+  const getEffectiveTopicMastery = (t: RoadmapTopicItem) => {
+    if (localOverrides[t.id] !== undefined) return localOverrides[t.id];
+    if (localOverrides[t.title] !== undefined) return localOverrides[t.title];
+    if (t.skill_name && localOverrides[t.skill_name] !== undefined) return localOverrides[t.skill_name];
+
+    const lower = t.title.toLowerCase();
+    for (const [key, val] of Object.entries(localOverrides)) {
+      const keyLower = key.toLowerCase();
+      if (
+        (lower.includes('embedded c') && keyLower.includes('embedded c')) ||
+        (lower.includes('arm') && keyLower.includes('arm')) ||
+        (lower.includes('cortex') && keyLower.includes('cortex')) ||
+        (lower.includes('microcontroller') && keyLower.includes('microcontroller')) ||
+        (lower.includes('firmware') && keyLower.includes('firmware')) ||
+        lower.includes(keyLower) || keyLower.includes(lower)
+      ) {
+        return val as number;
+      }
+    }
+    return t.mastery || 0;
+  };
 
   const getResourceIcon = (type: string) => {
     switch (type) {
@@ -366,62 +407,72 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
           </div>
 
           <div className="space-y-2">
-            {stage.topics.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => setSelectedTopic(t)}
-                className={cn(
-                  "p-3 rounded-xl border transition-all cursor-pointer",
-                  selectedTopic?.id === t.id
-                    ? "border-[#ea580c] bg-orange-50/20 dark:bg-orange-950/20"
-                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300"
-                )}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">{t.title}</span>
-                  <span className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                    t.status === 'COMPLETED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                    t.status === 'IN_PROGRESS' ? "bg-orange-50 text-[#ea580c] border-orange-200" :
-                    "bg-slate-100 text-slate-500 border-slate-200"
-                  )}>
-                    {t.mastery}%
-                  </span>
-                </div>
+            {stage.topics.map((t) => {
+              const effMastery = getEffectiveTopicMastery(t);
+              const isCompletedTopic = effMastery >= 70;
+              const isInProgressTopic = effMastery > 0 && effMastery < 70;
 
-                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all",
-                      t.mastery >= 70 ? "bg-emerald-500" : t.mastery > 0 ? "bg-[#ea580c]" : "bg-slate-300"
-                    )}
-                    style={{ width: `${t.mastery}%` }}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {t.estimated_time}
-                  </span>
-                  {onNavigateToMentor && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onNavigateToMentor({
-                          stageTitle: stage.title,
-                          skillName: t.skill_name,
-                          topicTitle: t.title,
-                          mastery: t.mastery,
-                        });
-                      }}
-                      className="text-[#ea580c] hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Bot className="w-3 h-3" /> Practice with Mentor
-                    </button>
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTopic(t)}
+                  className={cn(
+                    "p-3 rounded-xl border transition-all cursor-pointer",
+                    selectedTopic?.id === t.id
+                      ? "border-[#ea580c] bg-orange-50/20 dark:bg-orange-950/20"
+                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300"
                   )}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{t.title}</span>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                      isCompletedTopic ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                      isInProgressTopic ? "bg-orange-50 text-[#ea580c] border-orange-200" :
+                      "bg-slate-100 text-slate-500 border-slate-200"
+                    )}>
+                      {effMastery}%
+                    </span>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        isCompletedTopic ? "bg-emerald-500" : isInProgressTopic ? "bg-[#ea580c]" : "bg-slate-300"
+                      )}
+                      style={{ width: `${effMastery}%` }}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {t.estimated_time}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {onNavigateToMentor && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToMentor({
+                              stageTitle: stage.title,
+                              skillName: t.skill_name || t.title,
+                              topicTitle: t.title,
+                              mastery: effMastery,
+                              mode: 'assess',
+                            });
+                          }}
+                          className="bg-orange-50 dark:bg-orange-950/50 hover:bg-[#ea580c] text-[#ea580c] hover:text-white px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all border border-orange-200 dark:border-orange-900/50 text-[11px] shadow-xs"
+                          title="Take verified assessment quiz to raise topic progress"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Assess Topic
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -478,24 +529,16 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
             onClick={() => onStartStage(stage.id)}
             className="w-full py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-bold text-sm shadow-md shadow-[#ea580c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Play className="w-4 h-4 fill-current" /> Start Stage
+            <Sparkles className="w-4 h-4" /> Start Stage Assessment
           </button>
         )}
 
         {isInProgress && (
           <button
-            onClick={() => {
-              if (onNavigateToMentor) {
-                onNavigateToMentor({
-                  stageTitle: stage.title,
-                  skillName: stage.skills[0] || 'Optimization',
-                  mastery: stage.progress,
-                });
-              }
-            }}
+            onClick={() => onStartStage(stage.id)}
             className="w-full py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-bold text-sm shadow-md shadow-[#ea580c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Play className="w-4 h-4 fill-current" /> Resume Stage Learning
+            <Sparkles className="w-4 h-4" /> Continue Stage Assessment
           </button>
         )}
 

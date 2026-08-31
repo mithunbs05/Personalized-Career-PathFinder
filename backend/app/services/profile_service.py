@@ -35,7 +35,7 @@ async def verify_supabase_jwt(token: str) -> dict[str, Any] | None:
             }
         return None
     except Exception as e:
-        logger.error("JWT verification failed: %s", e)
+        logger.debug("JWT verification failed, falling back to default/cached user: %s", e)
         return None
 
 

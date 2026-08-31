@@ -38,6 +38,8 @@ from app.models.mentor import (
     UserSkillUpdateResponse,
 )
 from app.services.profile_service import verify_supabase_jwt
+from app.services.roadmap_service import _PIPELINE_STAGE_CACHE
+from app.services.knowledge_state_service import update_topic_evidence
 from app.services.mentor_service import (
     CANONICAL_STAGES,
     CANONICAL_SKILLS,
@@ -305,11 +307,20 @@ async def create_mentor_session(
         for s in CANONICAL_SKILLS
     ]
 
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "Embedded Systems & Firmware Engineer"
+    if user_profile:
+        if user_profile.get("profile_metadata"):
+            meta = user_profile["profile_metadata"]
+            target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        elif user_profile.get("target_goal"):
+            target_role = user_profile["target_goal"]
+
     focus = calculate_todays_focus(
         stages=CANONICAL_STAGES,
         user_skills=active_skills,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
         topic_progress=topic_progress,
     )
 
@@ -489,21 +500,37 @@ async def send_mentor_message(
     )
     session["history"].append({"role": "user", "content": request.message})
 
-    # Build focus for prompt
+    # Retrieve user's actual target role and focus
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "Embedded Systems & Firmware Engineer"
+    if user_profile:
+        if user_profile.get("profile_metadata"):
+            meta = user_profile["profile_metadata"]
+            target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        elif user_profile.get("target_goal"):
+            target_role = user_profile["target_goal"]
+
+    topic_progress = await get_user_topic_progress_from_db(user_id)
+    active_skills = [
+        {**s, "progress": next((t["mastery"] for t in topic_progress if t["skill_id"] == s["id"]), s["progress"])}
+        for s in CANONICAL_SKILLS
+    ]
+
     focus = calculate_todays_focus(
         stages=CANONICAL_STAGES,
-        user_skills=CANONICAL_SKILLS,
+        user_skills=active_skills,
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+        target_role=target_role,
+        topic_progress=topic_progress,
     )
 
-    # Generate reply
+    # Generate real-time LLM reply
     reply_text, suggested_actions = await generate_mentor_reply(
         user_message=request.message,
         history=session["history"],
         user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
-        current_stage=session.get("roadmap_stage", "Mathematics & Statistics"),
+        target_role=target_role,
+        current_stage=session.get("roadmap_stage", "Embedded Systems"),
         focus=focus,
         mode=session.get("mode", "learn"),
     )
@@ -559,9 +586,6 @@ async def get_practice_for_session(
     )
 
 
-# ---------------------------------------------------------------------------
-# 6. POST /api/v1/mentor/sessions/{session_id}/assessment
-# ---------------------------------------------------------------------------
 @router.post(
     "/sessions/{session_id}/assessment",
     response_model=CreateAssessmentResponse,
@@ -571,21 +595,56 @@ async def create_assessment(
     session_id: str,
     authorization: Optional[str] = Header(None),
 ) -> CreateAssessmentResponse:
-    """Generates assessment questions. Returns questions without answers to client."""
+    """Generates assessment questions for the active session's topic. Returns questions without answers to client."""
     user = await _get_auth_user(authorization)
-    focus = calculate_todays_focus(
-        stages=CANONICAL_STAGES,
-        user_skills=CANONICAL_SKILLS,
-        user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
+    user_id = user["id"]
+    session = _SESSION_STORE.get(session_id, {})
+
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "Embedded Systems & Firmware Engineer"
+    if user_profile:
+        if user_profile.get("profile_metadata"):
+            meta = user_profile["profile_metadata"]
+            target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        elif user_profile.get("target_goal"):
+            target_role = user_profile["target_goal"]
+
+    skill = session.get("skill") or "Embedded C/C++ Programming"
+    topic = session.get("topic") or skill
+    domain = session.get("domain") or "Embedded Systems"
+
+    topic_progress = await get_user_topic_progress_from_db(user_id)
+    topic_override_map = {t["skill_id"]: t["mastery"] for t in topic_progress}
+    for t in topic_progress:
+        if t.get("skill_name"):
+            topic_override_map[t["skill_name"]] = t["mastery"]
+
+    current_mastery = topic_override_map.get(skill, topic_override_map.get(topic, 0))
+
+    focus = TodaysFocus(
+        domain=domain,
+        skill=skill,
+        skill_id=session.get("skill_id") or f"topic-{skill.replace(' ', '-').lower()}",
+        topic=topic,
+        priority="HIGH",
+        mastery=current_mastery,
+        estimated_minutes=25,
+        reason=f"Target core competency required for {target_role}",
     )
 
     server_questions, client_questions = await generate_assessment_questions(focus, count=5)
 
     assessment_id = f"asm-{session_id}-{int(datetime.now().timestamp())}"
 
-    # Cache server questions securely for authoritative grading
-    _ASSESSMENT_CACHE[assessment_id] = server_questions
+    # Cache server questions securely with topic metadata for authoritative grading
+    _ASSESSMENT_CACHE[assessment_id] = {
+        "questions": server_questions,
+        "skill": skill,
+        "topic": topic,
+        "domain": domain,
+        "skill_id": focus.skill_id,
+        "previous_mastery": current_mastery,
+    }
 
     return CreateAssessmentResponse(
         assessment_id=assessment_id,
@@ -616,24 +675,45 @@ async def submit_assessment(
     user = await _get_auth_user(authorization)
     user_id = user["id"]
 
-    # Load server questions with answer key
-    server_questions = _ASSESSMENT_CACHE.get(assessment_id)
-    if not server_questions:
-        # Fallback to standard bank for Linear Algebra
-        server_questions = QUESTION_BANK.get("Linear Algebra", [])[:5]
+    cached_data = _ASSESSMENT_CACHE.get(assessment_id)
+    if isinstance(cached_data, dict):
+        server_questions = cached_data.get("questions", [])
+        skill_name = cached_data.get("skill", "Embedded C/C++ Programming")
+        skill_id = cached_data.get("skill_id", "topic-embedded-c")
+        topic_name = cached_data.get("topic", skill_name)
+        domain_name = cached_data.get("domain", "Embedded Systems")
+        prev_mastery = cached_data.get("previous_mastery", 0)
+    elif isinstance(cached_data, list):
+        server_questions = cached_data
+        skill_name = "Embedded C/C++ Programming"
+        skill_id = "topic-embedded-c"
+        topic_name = skill_name
+        domain_name = "Embedded Systems"
+        prev_mastery = 0
+    else:
+        server_questions = QUESTION_BANK.get("Embedded C/C++ Programming", [])[:5]
+        skill_name = "Embedded C/C++ Programming"
+        skill_id = "topic-embedded-c"
+        topic_name = skill_name
+        domain_name = "Embedded Systems"
+        prev_mastery = 0
 
-    focus = calculate_todays_focus(
-        stages=CANONICAL_STAGES,
-        user_skills=CANONICAL_SKILLS,
-        user_name=user.get("name", "Learner"),
-        target_role="AI/ML Engineer",
-    )
+    user_profile = await get_user_profile_from_db(user_id)
+    target_role = "Embedded Systems & Firmware Engineer"
+    if user_profile:
+        if user_profile.get("profile_metadata"):
+            meta = user_profile["profile_metadata"]
+            target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+        elif user_profile.get("target_goal"):
+            target_role = user_profile["target_goal"]
 
-    # 1. Authoritative Grading
+    # 1. Authoritative Grading with Diagnostic Analysis & Study Recommendations
     score, results, new_mastery, feedback = grade_assessment(
         server_questions=server_questions,
         user_answers=request.answers,
-        previous_mastery=focus.mastery,
+        previous_mastery=prev_mastery,
+        skill_name=skill_name,
+        target_role=target_role,
     )
 
     correct_count = sum(1 for r in results if r.correct)
@@ -642,43 +722,37 @@ async def submit_assessment(
     await save_assessment_to_db(
         session_id=None,
         user_id=user_id,
-        skill=focus.skill,
-        topic=focus.topic,
+        skill=skill_name,
+        topic=topic_name,
         score=score,
         total_questions=len(server_questions),
         questions_data=server_questions,
         results=results,
     )
 
-    # 3. Update topic progress
+    # 3. Update topic progress in DB
     await update_topic_progress_in_db(
         user_id=user_id,
-        skill_id=focus.skill_id,
-        skill_name=focus.skill,
-        domain=focus.domain,
-        topic=focus.topic,
+        skill_id=skill_id,
+        skill_name=skill_name,
+        domain=domain_name,
+        topic=topic_name,
         new_mastery=new_mastery,
         correct_count=correct_count,
     )
 
-    # 4. Recalculate Today's Focus dynamically with the new mastery!
-    user_profile = await get_user_profile_from_db(user_id)
-    target_role = "AI/ML Engineer"
-    if user_profile and user_profile.get("profile_metadata"):
-        meta = user_profile["profile_metadata"]
-        target_role = meta.get("target_role") or meta.get("career_goal") or meta.get("role") or target_role
+    try:
+        await update_topic_evidence(
+            user_id=user_id,
+            topic_id=topic_name,
+            new_score=score,
+            source="assessment",
+        )
+    except Exception as e:
+        logger.warning("Could not sync topic evidence: %s", e)
 
-    updated_skills = [
-        {**s, "progress": new_mastery if s["id"] == focus.skill_id else s["progress"]}
-        for s in CANONICAL_SKILLS
-    ]
-
-    updated_focus = calculate_todays_focus(
-        stages=CANONICAL_STAGES,
-        user_skills=updated_skills,
-        user_name=user.get("name", "Learner"),
-        target_role=target_role,
-    )
+    # Invalidate cache so all progress bars recalculate strictly from verified assessment
+    _PIPELINE_STAGE_CACHE.pop(user_id, None)
 
     return AssessmentSubmitResponse(
         assessment_id=assessment_id,
@@ -687,8 +761,8 @@ async def submit_assessment(
         total_questions=len(server_questions),
         results=results,
         new_mastery=new_mastery,
-        skill_name=focus.skill,
-        updated_focus=updated_focus,
+        skill_name=skill_name,
+        updated_focus=None,
         mentor_feedback=feedback,
     )
 
