@@ -219,7 +219,32 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
   const [selectedSkill, setSelectedSkill] = useState<SkillItem | null>(null);
   const [filterTab, setFilterTab] = useState<'All' | 'Verified' | 'In Progress' | 'Critical Gaps'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [simulatedLabs, setSimulatedLabs] = useState(0);
+  const [practiceProblems, setPracticeProblems] = useState<any[]>([]);
+  const [isGeneratingPractice, setIsGeneratingPractice] = useState(false);
+  const [practiceError, setPracticeError] = useState<string | null>(null);
+
+  const handleGeneratePractice = async () => {
+    try {
+      setIsGeneratingPractice(true);
+      setPracticeError(null);
+      const res = await fetch('http://localhost:8000/practice/generate-stage-practice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role_name: designatedRole,
+          stage_id: roleClusters[0]?.id || "stage-1",
+          stage_name: roleClusters[0]?.categoryName || "Core Requirements",
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate practice problems");
+      const data = await res.json();
+      setPracticeProblems(data.challenges || []);
+    } catch (err: any) {
+      setPracticeError(err.message);
+    } finally {
+      setIsGeneratingPractice(false);
+    }
+  };
 
   const [knowledgeProfile, setKnowledgeProfile] = useState<LearnerKnowledgeProfile | null>(null);
   const [roleGaps, setRoleGaps] = useState<RoleGapAnalysisPayload | null>(null);
@@ -459,7 +484,7 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
     return count > 0 ? Math.round(total / count) : 0;
   }, [roleClusters, roleGaps, overview]);
 
-  const simulatedReadiness = Math.min(100, baseReadiness + simulatedLabs * 3);
+  const simulatedReadiness = baseReadiness;
 
   const getLevelColor = (level: SkillItem['level']) => {
     switch (level) {
@@ -575,7 +600,7 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
             </p>
           </div>
 
-          <RadarChart data={dynamicRadarData} simulatedBoost={simulatedLabs * 10} />
+          <RadarChart data={dynamicRadarData} simulatedBoost={0} />
         </div>
 
         {/* Right: Job Role Readiness & What-If Simulator */}
@@ -604,7 +629,7 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
               {/* Simulated Bar */}
               <div
                 className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-700 ease-out"
-                style={{ width: `${simulatedReadiness}%`, opacity: simulatedLabs > 0 ? 1 : 0 }}
+                style={{ width: `${simulatedReadiness}%`, opacity: 0 }}
               />
               {/* Base Bar */}
               <div
@@ -658,33 +683,88 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
               </button>
             </div>
 
-            {/* What-If Simulator */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-              <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">"What-If" Simulator</h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                Simulate completing upcoming milestones for {designatedRole}.
-              </p>
-
-              <div className="mb-2 flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                <span>Simulate next {simulatedLabs} milestones</span>
-                <span className="text-emerald-600 dark:text-emerald-400">+{simulatedLabs * 3}%</span>
+            {/* AI Practice Generator */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1 flex items-center gap-1.5">
+                  <BrainCircuit className="w-4 h-4 text-[#ea580c]" /> AI Practice Generator
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                  Generate adaptive practice challenges (LeetCode, Kaggle, etc.) specifically tailored for {designatedRole}.
+                </p>
               </div>
 
-              <input
-                type="range"
-                min="0"
-                max="8"
-                step="1"
-                value={simulatedLabs}
-                onChange={(e) => setSimulatedLabs(Number(e.target.value))}
-                className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none"
-              />
-              <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-2">
-                <span>Current</span>
-                <span>+8 Milestones</span>
+              <div className="space-y-3">
+                {practiceError && (
+                  <div className="text-[10px] text-red-500 bg-red-50 dark:bg-red-950/20 p-2 rounded-lg border border-red-100 dark:border-red-900/50">
+                    {practiceError}
+                  </div>
+                )}
+                <button
+                  onClick={handleGeneratePractice}
+                  disabled={isGeneratingPractice}
+                  className="w-full py-2.5 bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-[#d84d08] hover:to-[#ea580c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isGeneratingPractice ? (
+                    <span className="animate-pulse">Generating Challenges...</span>
+                  ) : (
+                    <>Generate Challenges <Sparkles className="w-3.5 h-3.5" /></>
+                  )}
+                </button>
               </div>
             </div>
           </div>
+
+          {/* Practice Problems Section */}
+          <AnimatePresence>
+            {practiceProblems.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm overflow-hidden"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-emerald-500" /> Curated External Practice
+                  </h4>
+                  <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 px-2 py-0.5 rounded-full font-bold">
+                    {practiceProblems.length} Items
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {practiceProblems.map((prob, idx) => (
+                    <a
+                      key={idx}
+                      href={prob.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-[#ea580c] transition-colors group flex flex-col gap-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {prob.platform}
+                        </span>
+                        <span className={cn(
+                          "text-[10px] font-bold",
+                          prob.difficulty.toLowerCase() === 'hard' ? 'text-rose-500' :
+                          prob.difficulty.toLowerCase() === 'medium' ? 'text-amber-500' :
+                          'text-emerald-500'
+                        )}>
+                          {prob.difficulty}
+                        </span>
+                      </div>
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[#ea580c]">
+                        {prob.title}
+                      </h5>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                        {prob.why_it_matters}
+                      </p>
+                    </a>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
