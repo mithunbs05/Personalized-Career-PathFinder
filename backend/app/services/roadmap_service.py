@@ -935,12 +935,14 @@ async def get_roadmap_overview(
     weekly_hours = 10
     target_months = 6
     if user_profile and user_profile.get("profile_metadata"):
+        from app.services.profile_service import clean_int
         meta = user_profile["profile_metadata"]
-        weekly_hours = int(meta.get("weekly_hours", 10) or 10)
-        target_months = int(meta.get("target_completion_months", 6) or 6)
+        weekly_hours = clean_int(meta.get("weekly_hours"), 10)
+        target_months = clean_int(meta.get("target_completion_months"), 6)
         extracted_role = meta.get("target_role") or meta.get("target_goal") or meta.get("career_goal") or meta.get("job_specialization")
         if (not target_role or target_role == "AI/ML Engineer") and extracted_role:
             target_role = extracted_role
+
 
     # Seed knowledge state from onboarding profile (happens once on first load)
     await _seed_knowledge_from_onboarding(user_id, user_profile)

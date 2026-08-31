@@ -112,3 +112,35 @@ async def save_profile(
             "success": False,
             "message": f"Could not save profile to Supabase: {str(e)}",
         }
+
+
+def clean_int(val: Any, default: int) -> int:
+    """Safely extracts a positive integer from the input value (int, float, string),
+    returning the default if conversion fails or if the value is <= 0.
+    """
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return int(val) if val > 0 else default
+    
+    val_str = str(val).strip()
+    if not val_str:
+        return default
+        
+    try:
+        res = int(val_str)
+        return res if res > 0 else default
+    except ValueError:
+        pass
+        
+    import re
+    match = re.search(r'\d+', val_str)
+    if match:
+        try:
+            res = int(match.group(0))
+            return res if res > 0 else default
+        except ValueError:
+            pass
+            
+    return default
+

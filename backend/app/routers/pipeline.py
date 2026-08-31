@@ -171,10 +171,11 @@ async def generate_roadmap_endpoint(
     target_mos = 6
     
     if user_prof and user_prof.get("profile_metadata"):
+        from app.services.profile_service import clean_int
         meta = user_prof["profile_metadata"]
         target_role = meta.get("target_goal") or meta.get("target_role") or target_role
-        weekly_hrs = int(meta.get("weekly_hours", 10))
-        target_mos = int(meta.get("target_completion_months", 6))
+        weekly_hrs = clean_int(meta.get("weekly_hours"), 10)
+        target_mos = clean_int(meta.get("target_completion_months"), 6)
 
     if request:
         if request.target_role: target_role = request.target_role
@@ -202,10 +203,11 @@ async def get_personalized_roadmap_overview(
     weekly_hrs = 10
     target_mos = 6
     if user_prof and user_prof.get("profile_metadata"):
+        from app.services.profile_service import clean_int
         meta = user_prof["profile_metadata"]
         target_role = meta.get("target_goal") or meta.get("target_role") or target_role
-        weekly_hrs = int(meta.get("weekly_hours", 10))
-        target_mos = int(meta.get("target_completion_months", 6))
+        weekly_hrs = clean_int(meta.get("weekly_hours"), 10)
+        target_mos = clean_int(meta.get("target_completion_months"), 6)
 
     return await generate_personalized_roadmap(
         user_id=user["id"],
