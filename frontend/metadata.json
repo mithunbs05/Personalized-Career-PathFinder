@@ -1,0 +1,7 @@
+{
+  "name": "PathAI",
+  "description": "AI-Powered Personalized Learning Platform with Adaptive Roadmaps and Intelligent Guidance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
