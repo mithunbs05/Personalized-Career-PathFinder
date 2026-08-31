@@ -459,7 +459,7 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
                               skillName: t.skill_name || t.title,
                               topicTitle: t.title,
                               mastery: effMastery,
-                              mode: 'assess',
+                              model: 'assess',
                             });
                           }}
                           className="bg-orange-50 dark:bg-orange-950/50 hover:bg-[#ea580c] text-[#ea580c] hover:text-white px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all border border-orange-200 dark:border-orange-900/50 text-[11px] shadow-xs"
@@ -529,7 +529,7 @@ export const StageDetailsPanel: React.FC<StageDetailsPanelProps> = ({
             onClick={() => onStartStage(stage.id)}
             className="w-full py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-bold text-sm shadow-md shadow-[#ea580c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Sparkles className="w-4 h-4" /> Start Stage Assessment
+            <Sparkles className="w-4 h-4" /> Start Assessment
           </button>
         )}
 
