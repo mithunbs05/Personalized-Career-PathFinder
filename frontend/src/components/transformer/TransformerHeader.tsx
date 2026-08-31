@@ -33,8 +33,10 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Overall unified progress percentage
-  const unifiedPercent = Math.round((progress.conceptScore * 0.4) + (progress.practiceScore * 0.6));
+  // Progress strictly derived from verified assessment test cases
+  const assessmentPercent = progress.totalTests > 0
+    ? Math.round((progress.testsPassed / progress.totalTests) * 100)
+    : (progress.practiceScore || 0);
   const modulesList = availableModules && availableModules.length > 0 ? availableModules : TRANSFORMER_MODULES;
 
   return (
@@ -48,7 +50,7 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
           <span className="text-slate-300 dark:text-slate-700">•</span>
           <span>{currentModule.duration || '25 min'}</span>
           <span className="text-slate-300 dark:text-slate-700">•</span>
-          <span className="text-slate-700 dark:text-slate-300 font-bold">{unifiedPercent}% Complete</span>
+          <span className="text-slate-700 dark:text-slate-300 font-bold">{assessmentPercent}% Assessed Mastery</span>
         </div>
 
         {/* Right: SaaS Segmented Mode Switcher */}
@@ -155,12 +157,12 @@ export const TransformerHeader: React.FC<TransformerHeaderProps> = ({
         {/* Minimal Thin Progress Bar */}
         <div className="flex items-center gap-2.5 min-w-[140px] self-end sm:self-auto">
           <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300">
-            {unifiedPercent}%
+            {assessmentPercent}%
           </span>
           <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-[#FF5A3D] rounded-full transition-all duration-500"
-              style={{ width: `${unifiedPercent}%` }}
+              style={{ width: `${assessmentPercent}%` }}
             />
           </div>
         </div>

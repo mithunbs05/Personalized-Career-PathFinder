@@ -31,9 +31,9 @@ import {
 } from '../../services/pipeline.service';
 
 const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[]; simulatedBoost: number }) => {
-  const size = 300;
+  const size = 360;
   const center = size / 2;
-  const radius = size / 2 - 45;
+  const radius = 100;
   const numAxes = Math.max(3, data.length);
   const angleStep = (Math.PI * 2) / numAxes;
 
@@ -45,27 +45,30 @@ const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[]; simulatedBo
     };
   };
 
-  const getPolygonPoints = (getValue: (d: RadarMetric) => number) => {
+  const getPolygonPoints = (getValue: (d: RadarMetric) => number, isCurrent = false) => {
     return data
       .map((d, i) => {
-        const val = getValue(d) / d.fullMark;
+        const raw = getValue(d) / d.fullMark;
+        // Apply a subtle 10% baseline floor for current level so the shape does not collapse into a 1D spike
+        const val = isCurrent ? Math.max(0.1, raw) : raw;
         const { x, y } = getCoordinates(val, i);
         return `${x},${y}`;
       })
       .join(' ');
   };
 
-  const currentPoints = getPolygonPoints((d) => d.currentLevel);
+  const currentPoints = getPolygonPoints((d) => d.currentLevel, true);
   const simulatedPoints = getPolygonPoints((d) =>
     Math.min(
       d.currentLevel + (simulatedBoost > 0 && d.currentLevel < 60 ? simulatedBoost * 1.5 : 0),
       d.fullMark
-    )
+    ),
+    true
   );
-  const benchmarkPoints = getPolygonPoints((d) => d.industryBenchmark);
+  const benchmarkPoints = getPolygonPoints((d) => d.industryBenchmark, false);
 
   return (
-    <div className="relative flex justify-center items-center w-full aspect-square max-w-[350px] mx-auto group">
+    <div className="relative flex justify-center items-center w-full aspect-square max-w-[360px] mx-auto group">
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
         {/* Radar Web Background Levels */}
         {[0.25, 0.5, 0.75, 1].map((level, idx) => (
@@ -107,7 +110,7 @@ const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[]; simulatedBo
           fill="none"
           stroke="currentColor"
           className="text-slate-400 dark:text-slate-500"
-          strokeWidth={2}
+          strokeWidth={1.5}
           strokeDasharray="4 4"
         />
 
@@ -126,24 +129,30 @@ const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[]; simulatedBo
         {/* Current Level Polygon */}
         <polygon
           points={currentPoints}
-          fill="#f97316"
+          fill="#ea580c"
           fillOpacity={0.25}
           stroke="#ea580c"
           strokeWidth={2.5}
           className="transition-all duration-700 ease-out"
         />
 
-        {/* Outer Labels */}
+        {/* Outer Dimension Labels */}
         {data.map((d, i) => {
-          const { x, y } = getCoordinates(1.22, i);
+          const { x, y } = getCoordinates(1.24, i);
+          const angle = Math.PI / 2 - i * angleStep;
+          // Align text based on quadrant to prevent clipping
+          let textAnchor = "middle";
+          if (Math.cos(angle) > 0.3) textAnchor = "start";
+          else if (Math.cos(angle) < -0.3) textAnchor = "end";
+
           return (
             <g key={`label-${i}`} transform={`translate(${x}, ${y})`}>
               <text
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="text-[9px] font-bold fill-slate-700 dark:fill-slate-300"
+                textAnchor={textAnchor}
+                dominantBaseline="central"
+                className="text-[10px] font-bold fill-slate-700 dark:fill-slate-300 select-none"
               >
-                {d.subject.length > 18 ? d.subject.slice(0, 16) + '...' : d.subject}
+                {d.subject}
               </text>
             </g>
           );
@@ -151,16 +160,17 @@ const RadarChart = ({ data, simulatedBoost }: { data: RadarMetric[]; simulatedBo
 
         {/* Hover Points Tooltips */}
         {data.map((d, i) => {
-          const { x, y } = getCoordinates(d.currentLevel / d.fullMark, i);
+          const val = Math.max(0.1, d.currentLevel / d.fullMark);
+          const { x, y } = getCoordinates(val, i);
           return (
             <circle
               key={`point-${i}`}
               cx={x}
               cy={y}
-              r={4}
-              className="fill-[#ea580c] cursor-pointer hover:r-[6px] transition-all duration-200"
+              r={4.5}
+              className="fill-[#ea580c] stroke-white dark:stroke-slate-900 stroke-2 cursor-pointer hover:r-[6.5px] transition-all duration-200"
             >
-              <title>{`${d.subject}: ${d.currentLevel}% (Required: ${d.industryBenchmark}%)`}</title>
+              <title>{`${d.subject}: ${d.currentLevel}% (Required Benchmark: ${d.industryBenchmark}%)`}</title>
             </circle>
           );
         })}
@@ -396,8 +406,16 @@ export const SkillMatrix: React.FC<SkillMatrixProps> = ({
           ? Math.round(cluster.skills.reduce((acc, s) => acc + s.progress, 0) / cluster.skills.length)
           : 0;
 
+      // Clean and compact dimension labels
+      let cleanSubject = cluster.categoryName
+        .replace(/Architecture/gi, 'Arch')
+        .replace(/Operating Systems/gi, 'RTOS')
+        .replace(/Microcontrollers/gi, 'MCU Systems')
+        .replace(/Programming/gi, 'Dev')
+        .trim();
+
       return {
-        subject: cluster.categoryName.length > 18 ? cluster.categoryName.slice(0, 16) + '...' : cluster.categoryName,
+        subject: cleanSubject,
         currentLevel: avgProgress,
         industryBenchmark: 80,
         fullMark: 100,

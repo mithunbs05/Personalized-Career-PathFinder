@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LogOut, Flame, Clock, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { RoadmapCanvas } from '../components/roadmap/RoadmapCanvas';
@@ -126,16 +126,20 @@ export const Dashboard: React.FC = () => {
     };
   }, [selectedStageId]);
 
-  // Handler for starting a stage
+  // Handler for starting a stage and entering learning workspace
   const handleStartStage = async (stageId: number) => {
     try {
+      setSelectedStageId(stageId);
       await roadmapService.startStage(stageId);
       // Reload roadmap and active stage details to update statuses
       await loadRoadmap();
       const updated = await roadmapService.getStageDetails(stageId);
       setStageDetail(updated);
+      setActiveTab('practice');
     } catch (err) {
       console.error('Failed to start stage:', err);
+      setSelectedStageId(stageId);
+      setActiveTab('practice');
     }
   };
 
@@ -172,10 +176,73 @@ export const Dashboard: React.FC = () => {
     setActiveTab('skills');
   };
 
+  const [skillOverrides, setSkillOverrides] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pathai_skill_overrides') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        setSkillOverrides(JSON.parse(localStorage.getItem('pathai_skill_overrides') || '{}'));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+    // Interval check to ensure immediate local update sync
+    const interval = setInterval(handleStorage, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
+
   const stagesList = overview?.stages || DEFAULT_STAGES;
-  const progressPercentage = overview?.overall_progress ?? 0;
-  const streakDays = overview?.completed_stages ? `${overview.completed_stages * 3 + 1} Days` : '1 Day';
-  const loggedTimeHrs = overview?.overall_progress ? `${((overview.overall_progress / 100) * 12).toFixed(1)} hrs` : '0.0 hrs';
+
+  // Real-time Overall Mastery Calculation across all curriculum skills
+  const progressPercentage = useMemo(() => {
+    const overrideValues = Object.entries(skillOverrides)
+      .filter(([k, v]) => typeof v === 'number' && v > 0 && !k.startsWith('t') && isNaN(Number(k)))
+      .map(([_, v]) => v);
+
+    if (overrideValues.length > 0) {
+      const totalAllStages = stagesList.length * 100;
+      const assessedSum = overrideValues.reduce((acc, v) => acc + v, 0);
+      const calculated = Math.min(100, Math.round((assessedSum / Math.max(1, totalAllStages)) * 100));
+      return Math.max(calculated, overview?.overall_progress || 0, Math.round(assessedSum / overrideValues.length / stagesList.length));
+    }
+    return overview?.overall_progress ?? 0;
+  }, [skillOverrides, stagesList, overview]);
+
+  // Real-time Logged Time Calculation based on assessed topics & learning activities
+  const loggedTimeHrs = useMemo(() => {
+    const assessedTopics = Object.entries(skillOverrides).filter(
+      ([k, v]) => typeof v === 'number' && v > 0 && !k.startsWith('topic-') && isNaN(Number(k))
+    );
+    if (assessedTopics.length > 0) {
+      const hours = Math.max(0.3, assessedTopics.length * 0.35);
+      return `${hours.toFixed(1)} hrs`;
+    }
+    return overview?.overall_progress ? `${((overview.overall_progress / 100) * 12).toFixed(1)} hrs` : '0.0 hrs';
+  }, [skillOverrides, overview]);
+
+  // Real-time Consecutive Calendar Days Streak Tracking
+  const streakDays = useMemo(() => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const savedDates: string[] = JSON.parse(localStorage.getItem('pathai_active_dates') || '[]');
+      if (!savedDates.includes(todayStr)) {
+        savedDates.push(todayStr);
+        localStorage.setItem('pathai_active_dates', JSON.stringify(savedDates));
+      }
+      const count = Math.max(1, savedDates.length);
+      return count === 1 ? '1 Day' : `${count} Days`;
+    } catch {
+      return '1 Day';
+    }
+  }, []);
 
   return (
     <div className={isDarkMode ? 'dark-mode-active' : ''}>
@@ -201,7 +268,7 @@ export const Dashboard: React.FC = () => {
                 { id: 'roadmap', label: 'Roadmap Timeline' },
                 { id: 'skills', label: 'Skill Matrix' },
                 { id: 'mentor', label: 'AI Mentor' },
-                { id: 'practice', label: 'Content Transformer' },
+                { id: 'practice', label: 'Topic Assessments' },
               ].map((tab) => (
                 <button
                   key={tab.id}

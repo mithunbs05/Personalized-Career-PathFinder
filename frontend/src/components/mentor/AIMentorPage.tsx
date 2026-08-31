@@ -1,42 +1,32 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Send,
   Sparkles,
-  BookOpen,
-  Dumbbell,
   ClipboardCheck,
   Target,
   Map,
-  BarChart3,
-  ChevronRight,
-  Zap,
-  Brain,
-  MessageCircle,
-  HelpCircle,
-  Clock,
-  AlertTriangle,
   CheckCircle2,
   XCircle,
+  Clock,
+  ArrowRight,
+  RotateCcw,
+  BookOpen,
+  Award,
+  AlertCircle,
+  ChevronRight,
+  ShieldCheck,
   Loader2,
 } from 'lucide-react';
-import { RoadmapStage, SkillCluster, SkillItem } from '../../types/roadmap';
+import { RoadmapStage, SkillItem } from '../../types/roadmap';
 import { User } from '../../types/auth';
 import {
   TodaysFocus,
-  MentorMessage,
-  MentorMode,
-  AssessmentState,
-  QuickAction,
   AssessmentQuestion,
 } from '../../types/mentor';
 import { SKILL_CLUSTERS } from '../../data/mentorData';
 import {
   calculateTodaysFocus,
-  getMentorGreeting,
   mentorService,
-  CreateAssessmentPayload,
 } from '../../services/mentor.service';
-import { MarkdownMessageRenderer } from './MarkdownMessageRenderer';
 import { RoadmapOverviewResponse } from '../../services/roadmap.service';
 import { cn } from '../../lib/utils';
 
@@ -61,34 +51,15 @@ interface AIMentorPageProps {
   onNavigate: (tab: 'roadmap' | 'skills' | 'mentor' | 'practice') => void;
 }
 
-// ---------------------------------------------------------------------------
-// Quick Actions
-// ---------------------------------------------------------------------------
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { label: 'What should I study today?', prompt: 'What should I study today?', icon: 'target' },
-  { label: 'Explain my weakest skill', prompt: 'Explain my weakest skill in detail', icon: 'brain' },
-  { label: 'Give me practice questions', prompt: 'Give me practice questions for my current focus', icon: 'dumbbell' },
-  { label: 'Test my understanding', prompt: 'Test my understanding of my current focus topic', icon: 'clipboard' },
-  { label: 'Why is this skill important?', prompt: 'Why is my current focus skill important for my career?', icon: 'help' },
-  { label: 'Explain my next roadmap stage', prompt: 'Explain my next roadmap stage and what I need to prepare', icon: 'map' },
-];
-
-function getQuickActionIcon(icon: string) {
-  switch (icon) {
-    case 'target': return <Target className="w-3.5 h-3.5" />;
-    case 'brain': return <Brain className="w-3.5 h-3.5" />;
-    case 'dumbbell': return <Dumbbell className="w-3.5 h-3.5" />;
-    case 'clipboard': return <ClipboardCheck className="w-3.5 h-3.5" />;
-    case 'help': return <HelpCircle className="w-3.5 h-3.5" />;
-    case 'map': return <Map className="w-3.5 h-3.5" />;
-    default: return <Sparkles className="w-3.5 h-3.5" />;
-  }
+interface QuestionResultItem {
+  question_id: string;
+  question_text: string;
+  options: string[];
+  correct: boolean;
+  selected_option: number;
+  correct_option: number;
+  explanation: string;
 }
-
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
 
 export const AIMentorPage: React.FC<AIMentorPageProps> = ({
   stages,
@@ -97,65 +68,26 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({
   initialContext,
   onNavigate,
 }) => {
-  // Persistent State across reloads
-  const [mode, setMode] = useState<MentorMode>(() => {
-    if (initialContext?.mode) return initialContext.mode;
-    const saved = localStorage.getItem('pathai_mentor_mode');
-    return (saved === 'learn' || saved === 'practice' || saved === 'assess') ? saved : 'learn';
-  });
+  // Target context
+  const effectiveTargetRole = overview?.target_role || user?.profile?.targetGoal || 'Embedded Systems & Firmware Engineer';
+  const effectiveUserName = user?.name || overview?.user_name || 'Learner';
 
-  const [messages, setMessages] = useState<MentorMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem('pathai_mentor_messages');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
-
-  const [sessionActive, setSessionActive] = useState<boolean>(() => {
-    return localStorage.getItem('pathai_mentor_session_active') === 'true';
-  });
-
-  const [sessionId, setSessionId] = useState<string | null>(() => {
-    return localStorage.getItem('pathai_mentor_session_id') || null;
-  });
-
-  const [activeAssessmentId, setActiveAssessmentId] = useState<string | null>(() => {
-    return localStorage.getItem('pathai_mentor_assessment_id') || null;
-  });
-
-  const [assessmentState, setAssessmentState] = useState<AssessmentState | null>(() => {
-    try {
-      const saved = localStorage.getItem('pathai_mentor_assessment_state');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
+  const currentStage = useMemo(() => {
+    if (initialContext?.stageTitle) {
+      const match = stages.find(s => s.title.toLowerCase() === initialContext.stageTitle?.toLowerCase());
+      if (match) return match;
     }
-  });
-
-  const [assessmentResults, setAssessmentResults] = useState<Array<{
-    question_id: string;
-    correct: boolean;
-    selected_option: number;
-    correct_option: number;
-    explanation: string;
-  }> | null>(() => {
-    try {
-      const saved = localStorage.getItem('pathai_mentor_assessment_results');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
+    if (overview?.current_stage) {
+      return overview.current_stage;
     }
+    return stages.find(s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE') || stages[0] || null;
+  }, [stages, overview, initialContext]);
+
+  // Active Focus State
+  const [activeTopic, setActiveTopic] = useState<string>(() => {
+    return initialContext?.topicTitle || initialContext?.skillName || 'Embedded C/C++ Programming';
   });
 
-  const [serverAssessmentQuestions, setServerAssessmentQuestions] = useState<any[]>([]);
   const [skillOverrides, setSkillOverrides] = useState<Record<string, number>>(() => {
     try {
       const saved = localStorage.getItem('pathai_skill_overrides');
@@ -165,1191 +97,748 @@ export const AIMentorPage: React.FC<AIMentorPageProps> = ({
     }
   });
 
-  const [serverContext, setServerContext] = useState<any | null>(null);
-  const [serverFocus, setServerFocus] = useState<TodaysFocus | null>(null);
+  // Assessment Questions & Execution State
+  const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [userAnswers, setUserAnswers] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isStarted, setIsStarted] = useState<boolean>(false);
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Results & Review State
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [scorePercent, setScorePercent] = useState<number>(0);
+  const [correctCount, setCorrectCount] = useState<number>(0);
+  const [newMastery, setNewMastery] = useState<number>(0);
+  const [previousMastery, setPreviousMastery] = useState<number>(0);
+  const [mentorFeedback, setMentorFeedback] = useState<string>('');
+  const [detailedResults, setDetailedResults] = useState<QuestionResultItem[]>([]);
 
-  // Sync assessmentResults to localStorage
-  useEffect(() => {
-    if (assessmentResults) {
-      try {
-        localStorage.setItem('pathai_mentor_assessment_results', JSON.stringify(assessmentResults));
-      } catch {}
-    } else {
-      localStorage.removeItem('pathai_mentor_assessment_results');
-    }
-  }, [assessmentResults]);
-
-  // Sync state to localStorage
-  useEffect(() => {
-    localStorage.setItem('pathai_mentor_mode', mode);
-  }, [mode]);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      try {
-        localStorage.setItem('pathai_mentor_messages', JSON.stringify(messages));
-      } catch {}
-    }
-  }, [messages]);
-
-  // Handle cross-system contextual navigation from Roadmap or Skill Matrix
-  useEffect(() => {
-    if (initialContext) {
-      if (initialContext.mode) {
-        setMode(initialContext.mode);
-      }
-      if (initialContext.topicTitle) {
-        setServerFocus({
-          domain: initialContext.stageTitle || 'Current Learning Stage',
-          skill: initialContext.skillName || initialContext.topicTitle,
-          skillId: String(initialContext.stageId || 's1'),
-          topic: initialContext.topicTitle,
-          mastery: initialContext.mastery ?? 20,
-          priority: 'HIGH',
-          estimatedMinutes: 30,
-          reason: initialContext.reason || `Targeting key topic '${initialContext.topicTitle}' to advance your roadmap progress.`,
-          blocksStage: initialContext.stageTitle || null,
-        });
-
-        const actionText = initialContext.mode === 'practice'
-          ? `Let's practice core problems on "${initialContext.topicTitle}".`
-          : initialContext.mode === 'assess'
-          ? `I want to take a diagnostic assessment on "${initialContext.topicTitle}".`
-          : `Can you explain the key concepts and intuition behind "${initialContext.topicTitle}"?`;
-
-        setInputValue(actionText);
-      }
-    }
-  }, [initialContext]);
-
-  useEffect(() => {
-    localStorage.setItem('pathai_mentor_session_active', String(sessionActive));
-  }, [sessionActive]);
-
-  useEffect(() => {
-    if (sessionId) {
-      localStorage.setItem('pathai_mentor_session_id', sessionId);
-    } else {
-      localStorage.removeItem('pathai_mentor_session_id');
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (activeAssessmentId) {
-      localStorage.setItem('pathai_mentor_assessment_id', activeAssessmentId);
-    } else {
-      localStorage.removeItem('pathai_mentor_assessment_id');
-    }
-  }, [activeAssessmentId]);
-
-  useEffect(() => {
-    if (assessmentState) {
-      try {
-        localStorage.setItem('pathai_mentor_assessment_state', JSON.stringify(assessmentState));
-      } catch {}
-    } else {
-      localStorage.removeItem('pathai_mentor_assessment_state');
-    }
-  }, [assessmentState]);
-
-  useEffect(() => {
-    if (Object.keys(skillOverrides).length > 0) {
-      try {
-        localStorage.setItem('pathai_skill_overrides', JSON.stringify(skillOverrides));
-      } catch {}
-    }
-  }, [skillOverrides]);
-
-  // Derived user / role context
-  const effectiveTargetRole = overview?.target_role || user?.profile?.targetGoal || serverContext?.target_role || 'AI/ML Engineer';
-  const effectiveUserName = user?.name || overview?.user_name || serverContext?.user_name || 'Learner';
-
-  const currentStage = useMemo(() => {
-    if (overview?.current_stage) {
-      return overview.current_stage;
-    }
-    if (serverContext?.current_stage) {
-      const matched = stages.find(s => s.title.toLowerCase() === serverContext.current_stage.toLowerCase());
-      if (matched) return matched;
-    }
-    return stages.find(s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'NOT_STARTED') || stages[0] || null;
-  }, [stages, serverContext, overview]);
-
-  const nextStage = useMemo(() => {
-    if (overview?.next_stage) {
-      return overview.next_stage;
-    }
-    return stages.find(s => s.id > (currentStage?.id || 0)) || null;
-  }, [stages, currentStage, overview]);
-
-  const todaysFocus = useMemo(() => {
-    let focus: TodaysFocus | null = serverFocus ? { ...serverFocus } : null;
-    if (!focus) {
-      focus = calculateTodaysFocus(stages, SKILL_CLUSTERS, user, skillOverrides);
-    }
-    if (focus) {
-      const override = skillOverrides[focus.skillId] ?? skillOverrides[focus.skill] ?? (focus.skill.toLowerCase() === 'optimization' ? (skillOverrides['s7'] ?? skillOverrides['Optimization']) : undefined);
-      if (override !== undefined) {
-        focus = {
-          ...focus,
-          mastery: override,
-          priority: override >= 70 ? 'LOW' : override >= 40 ? 'MEDIUM' : 'HIGH',
-          reason: override >= 70
-            ? `Mastery reached ${override}%! Ready for advanced applications in upcoming stages.`
-            : override >= 30
-            ? `Good progress (${override}% mastery). Continue practice or assessment to unlock next milestone.`
-            : focus.reason,
-        };
-      }
-    }
-    return focus;
-  }, [serverFocus, stages, user, skillOverrides]);
-
-  const completedStages = useMemo(() => {
-    return stages.filter(s => s.status === 'COMPLETED').length;
-  }, [stages]);
-
-  const progressPercentage = useMemo(() => {
-    return overview?.overall_progress ?? (serverContext?.overall_mastery ?? 0);
-  }, [overview, serverContext]);
-
-  // Get relevant skills for snapshot directly from live backend context or current stage
-  const snapshotSkills = useMemo(() => {
-    if (serverContext?.relevant_skills && serverContext.relevant_skills.length > 0) {
-      const serverSkills = serverContext.relevant_skills.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        domain: s.domain || 'Core Skills',
-        level: s.level || 'Novice',
-        progress: skillOverrides[s.id] !== undefined ? skillOverrides[s.id] : (s.progress || 0),
-        isVerified: Boolean(s.is_verified),
-      }));
-
-      const focusSkillId = todaysFocus?.skillId;
-      return serverSkills
-        .sort((a: any, b: any) => {
-          if (a.id === focusSkillId) return -1;
-          if (b.id === focusSkillId) return 1;
-          return a.progress - b.progress;
-        })
-        .slice(0, 5);
-    }
-
-    // Fallback directly to active stage topics / skills starting at 0%
-    const stageTopics = (currentStage as any)?.topics || [];
-    if (stageTopics.length > 0) {
-      return stageTopics.slice(0, 5).map((t: any) => ({
+  // Stage topics list for the sidebar
+  const stageTopics = useMemo(() => {
+    const rawTopics = (currentStage as any)?.topics || [];
+    if (rawTopics.length > 0) {
+      return rawTopics.map((t: any) => ({
         id: t.id,
         name: t.title,
-        domain: currentStage?.title || 'Active Stage',
-        level: ((t.mastery || 0) >= 70 ? 'Proficient' : ((t.mastery || 0) >= 40 ? 'Developing' : 'Novice')) as SkillItem['level'],
-        progress: skillOverrides[t.id] !== undefined ? skillOverrides[t.id] : (t.progress || t.mastery || 0),
-        isVerified: (t.mastery || 0) >= 75,
+        mastery: skillOverrides[t.id] !== undefined ? skillOverrides[t.id] : (skillOverrides[t.title] !== undefined ? skillOverrides[t.title] : (t.mastery || 0)),
+        estimated_time: t.estimated_time || '45 min',
       }));
     }
-
-    const stageSkillNames = currentStage?.skills || ['Python Basics', 'Control Flow', 'Functions'];
-    return stageSkillNames.slice(0, 5).map((name, idx) => ({
-      id: `stage-sk-${idx}`,
-      name,
-      domain: currentStage?.title || 'Active Stage',
-      level: 'Novice' as SkillItem['level'],
-      progress: skillOverrides[name] !== undefined ? skillOverrides[name] : 0,
-      isVerified: false,
+    const rawSkills = currentStage?.skills || ['Embedded C/C++ Programming', 'ARM Cortex-M Architecture', 'Microcontroller Architecture'];
+    return rawSkills.map((s, i) => ({
+      id: `topic-${i}`,
+      name: s,
+      mastery: skillOverrides[s] !== undefined ? skillOverrides[s] : 0,
+      estimated_time: '45 min',
     }));
-  }, [serverContext, currentStage, todaysFocus, skillOverrides]);
+  }, [currentStage, skillOverrides]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  // Select Topic without auto-starting the quiz
+  const handleSelectTopic = (topicName: string) => {
+    setActiveTopic(topicName);
+    setIsStarted(false);
+    setIsCompleted(false);
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setUserAnswers([]);
+    setDetailedResults([]);
+    const curr = skillOverrides[topicName] || 0;
+    setPreviousMastery(curr);
+  };
 
-  // Initial greeting and live server synchronization on mount (preserves existing conversation)
-  useEffect(() => {
-    const initMentor = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch live context from server
-        const ctx = await mentorService.getContext();
-        setServerContext(ctx);
-        if (ctx?.focus) {
-          setServerFocus(ctx.focus);
-        }
-
-        // Generate dynamic greeting tailored to current authenticated user
-        setMessages(prev => {
-          // If previous messages contain old demo user 'Alex Rivera' or mismatched greeting, regenerate
-          const hasStaleDemoGreeting = prev.length === 1 && (prev[0].text.includes('Alex Rivera') || prev[0].text.includes('Optimization (10% mastery)'));
-          if (prev.length > 0 && !hasStaleDemoGreeting) return prev;
-
-          if (ctx?.recent_messages && ctx.recent_messages.length > 0 && !hasStaleDemoGreeting) {
-            return ctx.recent_messages.map((m: any) => ({
-              id: m.id || `msg-${Date.now()}-${Math.random()}`,
-              sender: m.sender,
-              text: m.text,
-              timestamp: m.timestamp || new Date().toISOString(),
-            }));
-          }
-
-          let effectiveFocus = ctx?.focus ? { ...ctx.focus } : calculateTodaysFocus(stages, SKILL_CLUSTERS, user, skillOverrides);
-          if (effectiveFocus) {
-            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill];
-            if (override !== undefined) {
-              effectiveFocus.mastery = override;
-            }
-          }
-          const greeting = getMentorGreeting(effectiveFocus, effectiveUserName, effectiveTargetRole, mode);
-          return [greeting];
-        });
-
-        if (ctx?.active_session_id && !sessionId) {
-          setSessionId(ctx.active_session_id);
-          setSessionActive(true);
-        }
-      } catch (err) {
-        console.warn('Backend context initial fetch error:', err);
-        setMessages(prev => {
-          const hasStaleDemoGreeting = prev.length === 1 && (prev[0].text.includes('Alex Rivera') || prev[0].text.includes('Optimization (10% mastery)'));
-          if (prev.length > 0 && !hasStaleDemoGreeting) return prev;
-
-          let effectiveFocus = calculateTodaysFocus(stages, SKILL_CLUSTERS, user, skillOverrides);
-          if (effectiveFocus) {
-            const override = skillOverrides[effectiveFocus.skillId] ?? skillOverrides[effectiveFocus.skill];
-            if (override !== undefined) {
-              effectiveFocus.mastery = override;
-            }
-          }
-          const greeting = getMentorGreeting(effectiveFocus, effectiveUserName, effectiveTargetRole, mode);
-          return [greeting];
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initMentor();
-  }, [effectiveUserName, effectiveTargetRole]);
-
-  // Send message handler (Live Backend AI with Local Fallback)
-  const handleSendMessage = useCallback(async (text?: string) => {
-    const messageText = text || inputValue.trim();
-    if (!messageText || isLoading) return;
-
-    const userMessage: MentorMessage = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: messageText,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+  // Explicit Start Assessment Handler
+  const handleStartAssessment = async () => {
     setIsLoading(true);
+    setIsStarted(true);
+    setIsCompleted(false);
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setUserAnswers([]);
+    setDetailedResults([]);
 
     try {
-      let activeSessId = sessionId;
-      if (!activeSessId) {
-        // Create session on-demand if none active
-        const sessRes = await mentorService.createSession(mode, todaysFocus);
-        activeSessId = sessRes.id;
-        setSessionId(activeSessId);
-        setSessionActive(true);
-      }
-
-      const aiResponse = await mentorService.sendMessage(activeSessId, messageText);
-
-      const assistantMessage: MentorMessage = {
-        id: aiResponse.id || `response-${Date.now()}`,
-        sender: 'ai',
-        text: aiResponse.reply,
-        timestamp: new Date().toISOString(),
+      const topicFocus: TodaysFocus = {
+        domain: currentStage?.title || 'Embedded Systems',
+        skill: activeTopic,
+        skill_id: `topic-${activeTopic.replace(/\s+/g, '-').toLowerCase()}`,
+        topic: activeTopic,
+        priority: 'HIGH',
+        mastery: skillOverrides[activeTopic] || 0,
+        estimated_minutes: 25,
+        reason: `Target core competency required for ${effectiveTargetRole}`,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setPreviousMastery(topicFocus.mastery);
+
+      // Create session & fetch secure assessment
+      const sessRes = await mentorService.createSession('assess', topicFocus);
+      const asmRes = await mentorService.createAssessment(sessRes.id);
+
+      setAssessmentId(asmRes.assessment_id);
+
+      const clientQs: AssessmentQuestion[] = asmRes.questions.slice(0, 5).map(q => ({
+        id: q.id,
+        text: q.text,
+        options: q.options,
+        correctAnswer: -1,
+        explanation: '',
+      }));
+
+      setQuestions(clientQs);
     } catch (err) {
-      console.error('Failed to communicate with AI Mentor backend:', err);
-      const errorMsg: MentorMessage = {
-        id: `error-${Date.now()}`,
-        sender: 'ai',
-        text: `⚠️ **Connection Error:** Could not reach the AI Mentor service. Please check your network connection and try sending your message again.`,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      console.warn('Could not fetch assessment from backend, initializing fallback assessment:', err);
+      // Fallback domain questions
+      const fallbackQuestions: AssessmentQuestion[] = [
+        {
+          id: 'fb-1',
+          text: `In ${activeTopic}, why is the 'volatile' qualifier essential when pointing to memory-mapped hardware peripheral registers?`,
+          options: [
+            'It allocates the register on the heap',
+            'It informs the compiler that the register value can change asynchronously, preventing optimization reads',
+            'It enables multi-threaded locking',
+            'It makes the pointer read-only',
+          ],
+          correctAnswer: 1,
+          explanation: 'Volatile tells the compiler that hardware or ISRs may alter the memory value at any time, preventing stale register caching in CPU registers.',
+        },
+        {
+          id: 'fb-2',
+          text: `Which standard memory segment stores uninitialized global and static variables zeroed at startup?`,
+          options: ['.rodata segment', '.bss segment in RAM', 'Stack frame', 'Vector table'],
+          correctAnswer: 1,
+          explanation: 'The .bss section contains uninitialized global/static variables and is cleared to zero by startup routines before main().',
+        },
+        {
+          id: 'fb-3',
+          text: `Which bitwise operation sets Bit 3 of register REG without modifying any other bits?`,
+          options: ['REG &= ~(1 << 3);', 'REG |= (1 << 3);', 'REG ^= (1 << 3);', 'REG = (1 << 3);'],
+          correctAnswer: 1,
+          explanation: 'Bitwise OR with (1 << 3) sets bit 3 to 1 while preserving all other bits in the register.',
+        },
+        {
+          id: 'fb-4',
+          text: `What is the key consequence of invoking dynamic memory allocation (malloc) inside an Interrupt Handler (ISR)?`,
+          options: [
+            'It corrupts peripheral registers',
+            'It is non-deterministic, causes unbounded latency, and risks heap corruption or deadlock',
+            'It doubles CPU clock frequency',
+            'It disables all hardware interrupts permanently',
+          ],
+          correctAnswer: 1,
+          explanation: 'malloc() is non-reentrant and non-deterministic. Calling it in an ISR can cause priority inversion and unbounded interrupt response times.',
+        },
+        {
+          id: 'fb-5',
+          text: `In C pointer arithmetic, advancing a 'uint32_t*' pointer by 1 (ptr + 1) advances the address by how many bytes?`,
+          options: ['1 byte', '4 bytes (sizeof(uint32_t))', '8 bytes', '2 bytes'],
+          correctAnswer: 1,
+          explanation: 'Pointer arithmetic scales by the size of the underlying type. Since uint32_t is 4 bytes, ptr + 1 advances the address by 4 bytes.',
+        },
+      ];
+      setQuestions(fallbackQuestions);
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, sessionId, mode, todaysFocus]);
+  };
 
-  // Start Session handler (Live Backend Session Creation)
-  const handleStartSession = useCallback(async (overrideMode?: MentorMode) => {
-    const targetMode = overrideMode || mode;
-    if (!todaysFocus) return;
-    setIsLoading(true);
+  // Initial load
+  useEffect(() => {
+    setIsLoading(false);
+    const curr = skillOverrides[activeTopic] || 0;
+    setPreviousMastery(curr);
+  }, [activeTopic]);
 
-    try {
-      const sessRes = await mentorService.createSession(targetMode, todaysFocus);
-      const activeSessId = sessRes.id;
-      setSessionId(activeSessId);
-      setSessionActive(true);
-      if (overrideMode) {
-        setMode(overrideMode);
-      }
+  // Handle Option Click
+  const handleSelectOption = (index: number) => {
+    setSelectedOption(index);
+  };
 
-      const currentMastery = todaysFocus.mastery;
-      const sessionGreeting: MentorMessage = {
-        id: `session-greet-${Date.now()}`,
-        sender: 'ai',
-        text: `🎯 **${targetMode.charAt(0).toUpperCase() + targetMode.slice(1)} Session Started: ${todaysFocus.skill}**\n\nYou're focusing on **${todaysFocus.skill}** (${currentMastery}% mastery) in **${todaysFocus.domain}**.\n*${todaysFocus.reason}*\n\nHow would you like to begin?`,
-        timestamp: new Date().toISOString(),
-      };
+  // Submit Answer & Move Next or Complete
+  const handleNextQuestion = async () => {
+    if (selectedOption === null) return;
 
-      setMessages(prev => [...prev, sessionGreeting]);
+    const newAnswers = [...userAnswers, selectedOption];
+    setUserAnswers(newAnswers);
+    setSelectedOption(null);
 
-      if (targetMode === 'assess') {
-        // Generate secure assessment questions from server
-        const asmRes = await mentorService.createAssessment(activeSessId);
-        setActiveAssessmentId(asmRes.assessment_id);
-
-        const clientQuestions: AssessmentQuestion[] = asmRes.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          correctAnswer: -1, // Hidden on client until server evaluation
-          explanation: '',
-        }));
-
-        setServerAssessmentQuestions(clientQuestions);
-
-        setAssessmentState({
-          questions: clientQuestions,
-          currentIndex: 0,
-          answers: new Array(clientQuestions.length).fill(null),
-          isComplete: false,
-          score: null,
-        });
-
-        // Send first question
-        const firstQ = clientQuestions[0];
-        const questionMsg: MentorMessage = {
-          id: `q-0-${Date.now()}`,
-          sender: 'ai',
-          text: `**Question 1 of ${clientQuestions.length}:**\n\n${firstQ.text}`,
-          timestamp: new Date().toISOString(),
-          isAssessmentQuestion: true,
-          questionIndex: 0,
-          options: firstQ.options,
-        };
-
-        setTimeout(() => {
-          setMessages(prev => [...prev, questionMsg]);
-        }, 400);
-      } else if (targetMode === 'practice') {
-        // Fetch practice challenge from server
-        const practiceRes = await mentorService.getPractice(activeSessId);
-        const practiceMsg: MentorMessage = {
-          id: `practice-${Date.now()}`,
-          sender: 'ai',
-          text: `${practiceRes.exercise_prompt}\n\n${practiceRes.hints && practiceRes.hints.length > 0 ? `💡 **Hints:**\n${practiceRes.hints.map(h => `• ${h}`).join('\n')}` : ''}`,
-          timestamp: new Date().toISOString(),
-        };
-        setTimeout(() => {
-          setMessages(prev => [...prev, practiceMsg]);
-        }, 400);
-      }
-    } catch (err) {
-      console.warn('Session start error, using local fallback:', err);
-      setSessionActive(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [todaysFocus, mode]);
-
-  // Restart Session Handler (Clean state and localStorage reset)
-  const handleRestartSession = useCallback(() => {
-    localStorage.removeItem('pathai_mentor_messages');
-    localStorage.removeItem('pathai_mentor_session_id');
-    localStorage.removeItem('pathai_mentor_session_active');
-    localStorage.removeItem('pathai_mentor_assessment_id');
-    localStorage.removeItem('pathai_mentor_assessment_state');
-
-    setSessionId(null);
-    setSessionActive(false);
-    setAssessmentState(null);
-    const greeting = getMentorGreeting(todaysFocus, effectiveUserName, effectiveTargetRole, mode);
-    setMessages([greeting]);
-  }, [todaysFocus, effectiveUserName, effectiveTargetRole, mode]);
-
-  // Quick Action click handler
-  const handleQuickAction = useCallback(async (action: QuickAction) => {
-    if (isLoading) return;
-
-    if (action.label === 'Give me practice questions') {
-      handleStartSession('practice');
-    } else if (action.label === 'Test my understanding') {
-      handleStartSession('assess');
+    if (currentIndex + 1 < questions.length) {
+      setCurrentIndex(prev => prev + 1);
     } else {
-      let promptText = action.prompt;
-      if (action.label === 'Explain my weakest skill' && todaysFocus) {
-        promptText = `Explain my current focus skill, ${todaysFocus.skill}, and provide a detailed breakdown of core concepts I should master.`;
-      } else if (action.label === 'Why is this skill important?' && todaysFocus) {
-        promptText = `Why is ${todaysFocus.skill} important for my goal of becoming a ${effectiveTargetRole}?`;
-      } else if (action.label === 'Explain my next roadmap stage' && nextStage) {
-        promptText = `Explain my next roadmap stage, ${nextStage.title}, and what foundational concepts from my current stage I should master first.`;
-      }
-      handleSendMessage(promptText);
-    }
-  }, [isLoading, todaysFocus, effectiveTargetRole, nextStage, handleStartSession, handleSendMessage]);
-
-  // Assessment answer handler (Server-Side Authoritative Grading + Instant UI Feedback & Resilient Fallback)
-  const handleAssessmentAnswer = useCallback(async (questionIdx: number, optionIndex: number) => {
-    if (!assessmentState || assessmentState.isComplete || isSubmittingAssessment) return;
-
-    const { questions, answers } = assessmentState;
-    const newAnswers = [...answers];
-    newAnswers[questionIdx] = optionIndex;
-
-    // 1. Immediately update UI state so clicked option turns selected and active
-    setAssessmentState(prev => prev ? {
-      ...prev,
-      answers: newAnswers,
-    } : null);
-
-    const isLastQuestion = questionIdx >= questions.length - 1;
-
-    if (isLastQuestion) {
-      setIsSubmittingAssessment(true);
-
-      const evalMsgId = `eval-${Date.now()}`;
-      const evalMsg: MentorMessage = {
-        id: evalMsgId,
-        sender: 'ai',
-        text: `⏳ **Evaluating your answers & calculating updated mastery...**`,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, evalMsg]);
-
+      // Completed all 5 questions -> Submit to server for authoritative grading!
+      setIsSubmitting(true);
       try {
-        const asmId = activeAssessmentId || `asm-${Date.now()}`;
-        const submissionResult = await mentorService.submitAssessment(
-          asmId,
-          newAnswers.map(a => (a !== null ? a : 0))
-        );
+        let evaluatedScore = 0;
+        let evaluatedMastery = previousMastery;
+        let resultsList: QuestionResultItem[] = [];
+        let feedbackText = '';
 
-        // Remove the temporary evaluating placeholder
-        setMessages(prev => prev.filter(m => m.id !== evalMsgId));
+        if (assessmentId) {
+          try {
+            const submission = await mentorService.submitAssessment(assessmentId, newAnswers);
+            evaluatedScore = submission.score;
+            evaluatedMastery = submission.new_mastery;
+            feedbackText = submission.mentor_feedback;
 
-        // Store authoritative question results for live visual differentiation
-        setAssessmentResults(submissionResult.results);
+            resultsList = questions.map((q, idx) => {
+              const sr = submission.results[idx];
+              return {
+                question_id: q.id,
+                question_text: q.text,
+                options: q.options,
+                correct: sr ? sr.correct : false,
+                selected_option: newAnswers[idx],
+                correct_option: sr ? sr.correct_option : 1,
+                explanation: sr ? sr.explanation : 'Review foundational principles for this topic.',
+              };
+            });
+          } catch (apiErr) {
+            console.warn('Backend grading fallback:', apiErr);
+          }
+        }
 
-        // Render per-question result messages
-        submissionResult.results.forEach((r, idx) => {
-          const resultMsg: MentorMessage = {
-            id: `answer-res-${idx}-${Date.now()}`,
-            sender: 'ai',
-            text: `${r.correct ? '✅ **Correct!**' : `❌ **Incorrect.** The correct answer was option ${String.fromCharCode(65 + r.correct_option)}.`}\n\n💡 ${r.explanation}`,
-            timestamp: new Date().toISOString(),
-          };
-          setMessages(prev => [...prev, resultMsg]);
-        });
-
-        // Summary message
-        const summaryMsg: MentorMessage = {
-          id: `summary-${Date.now()}`,
-          sender: 'ai',
-          text: `📊 **Assessment Complete!**\n\n**Score: ${submissionResult.correct_count}/${submissionResult.total_questions} (${submissionResult.score}%)**\n\n${submissionResult.mentor_feedback}\n\n*Updated ${submissionResult.skill_name} mastery to ${submissionResult.new_mastery}%. Today's Focus recalculated!*`,
-          timestamp: new Date().toISOString(),
-        };
-
-        setMessages(prev => [...prev, summaryMsg]);
-
-        // Update skill mastery dynamically
-        const newMastery = submissionResult.new_mastery;
-        const skillName = submissionResult.skill_name || todaysFocus?.skill || 'Optimization';
-        const skillId = todaysFocus?.skillId || 's7';
-
-        if (submissionResult.updated_focus) {
-          setServerFocus({
-            ...submissionResult.updated_focus,
-            mastery: newMastery,
+        if (resultsList.length === 0) {
+          // Local evaluation fallback
+          let corr = 0;
+          resultsList = questions.map((q, idx) => {
+            const userChoice = newAnswers[idx];
+            const correctChoice = q.correctAnswer >= 0 ? q.correctAnswer : 1;
+            const isCorrect = userChoice === correctChoice;
+            if (isCorrect) corr += 1;
+            return {
+              question_id: q.id,
+              question_text: q.text,
+              options: q.options,
+              correct: isCorrect,
+              selected_option: userChoice,
+              correct_option: correctChoice,
+              explanation: q.explanation || 'Verified through standard engineering specifications.',
+            };
           });
-        } else {
-          setServerFocus(prev => prev ? {
-            ...prev,
-            mastery: newMastery,
-          } : null);
+          evaluatedScore = Math.round((corr / questions.length) * 100);
+          evaluatedMastery = Math.min(100, Math.round(previousMastery * 0.4 + evaluatedScore * 0.6));
+          feedbackText = evaluatedScore >= 80
+            ? `🎉 Outstanding work! You demonstrated strong mastery of ${activeTopic}.`
+            : `💡 Assessment complete. Review the specific concepts below to strengthen your score.`;
         }
 
-        setSkillOverrides(prev => ({
-          ...prev,
-          [skillId]: newMastery,
-          [skillName]: newMastery,
-          's7': newMastery,
-          'Optimization': newMastery,
-        }));
+        const correctTotal = resultsList.filter(r => r.correct).length;
+        setCorrectCount(correctTotal);
+        setScorePercent(evaluatedScore);
+        setNewMastery(evaluatedMastery);
+        setMentorFeedback(feedbackText);
+        setDetailedResults(resultsList);
+        setIsCompleted(true);
 
-        if (serverContext) {
-          setServerContext((prev: any) => prev ? {
+        // Update persistence & live state
+        setSkillOverrides(prev => {
+          const updated = {
             ...prev,
-            overall_mastery: Math.min(100, (prev.overall_mastery || 33) + 2),
-            focus: submissionResult.updated_focus ? { ...submissionResult.updated_focus, mastery: newMastery } : (prev.focus ? { ...prev.focus, mastery: newMastery } : prev.focus),
-            relevant_skills: (prev.relevant_skills || []).map((s: any) =>
-              s.name === skillName || s.id === skillId || s.name === 'Optimization' || s.id === 's7'
-                ? { ...s, progress: newMastery }
-                : s
-            ),
-          } : prev);
-        }
-
-        setAssessmentState(prev => prev ? {
-          ...prev,
-          answers: newAnswers,
-          isComplete: true,
-          score: submissionResult.score,
-        } : null);
-      } catch (err) {
-        console.warn('Backend assessment submission encountered issue, applying local authoritative fallback:', err);
-        const total = questions.length;
-        const fallbackResults = questions.map((q, i) => {
-          const userSel = newAnswers[i] !== null ? newAnswers[i] : 0;
-          const correctOpt = q.correctAnswer >= 0 ? q.correctAnswer : (i % 2 === 0 ? 0 : 1);
-          const isCorr = userSel === correctOpt;
-          return {
-            question_id: q.id,
-            correct: isCorr,
-            selected_option: userSel,
-            correct_option: correctOpt,
-            explanation: q.explanation || (isCorr ? 'Correct principle applied.' : `Option ${String.fromCharCode(65 + correctOpt)} is the correct answer.`),
+            [activeTopic]: evaluatedMastery,
+            [`topic-${activeTopic.replace(/\s+/g, '-').toLowerCase()}`]: evaluatedMastery,
+            'Embedded C/C++ Programming': evaluatedMastery,
+            'Embedded C, Memory Layout & Pointer Arithmetic': evaluatedMastery,
           };
+          try {
+            localStorage.setItem('pathai_skill_overrides', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          } catch {}
+          return updated;
         });
 
-        setAssessmentResults(fallbackResults);
-
-        const correctCount = fallbackResults.filter(r => r.correct).length;
-        const scorePercent = Math.round((correctCount / total) * 100);
-        const prevMastery = todaysFocus?.mastery || 10;
-        const newMastery = Math.min(100, Math.round(prevMastery * 0.4 + scorePercent * 0.6));
-        const skillName = todaysFocus?.skill || 'Optimization';
-        const skillId = todaysFocus?.skillId || 's7';
-
-        setMessages(prev => prev.filter(m => m.id !== evalMsgId));
-
-        const fallbackSummary: MentorMessage = {
-          id: `summary-fallback-${Date.now()}`,
-          sender: 'ai',
-          text: `📊 **Assessment Complete!**\n\n**Score: ${correctCount}/${total} (${scorePercent}%)**\n\nGreat job completing all 5 questions! Your mastery for **${skillName}** has updated to **${newMastery}%**.\n\n*Click **Practice** or ask your mentor to keep advancing!*`,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, fallbackSummary]);
-
-        setSkillOverrides(prev => ({
-          ...prev,
-          [skillId]: newMastery,
-          [skillName]: newMastery,
-          's7': newMastery,
-          'Optimization': newMastery,
-        }));
-
-        setServerFocus(prev => prev ? {
-          ...prev,
-          mastery: newMastery,
-        } : null);
-
-        if (serverContext) {
-          setServerContext((prev: any) => prev ? {
-            ...prev,
-            overall_mastery: Math.min(100, (prev.overall_mastery || 33) + 2),
-            focus: prev.focus ? { ...prev.focus, mastery: newMastery } : prev.focus,
-            relevant_skills: (prev.relevant_skills || []).map((s: any) =>
-              s.name === skillName || s.id === skillId || s.name === 'Optimization' || s.id === 's7'
-                ? { ...s, progress: newMastery }
-                : s
-            ),
-          } : prev);
-        }
-
-        setAssessmentState(prev => prev ? {
-          ...prev,
-          answers: newAnswers,
-          isComplete: true,
-          score: scorePercent,
-        } : null);
       } finally {
-        setIsSubmittingAssessment(false);
-      }
-    } else {
-      // Advance to next question
-      const nextIndex = questionIdx + 1;
-      const nextQ = questions[nextIndex];
-
-      setAssessmentState(prev => prev ? {
-        ...prev,
-        currentIndex: nextIndex,
-        answers: newAnswers,
-      } : null);
-
-      if (nextQ) {
-        setTimeout(() => {
-          const nextMsg: MentorMessage = {
-            id: `q-${nextIndex}-${Date.now()}`,
-            sender: 'ai',
-            text: `**Question ${nextIndex + 1} of ${questions.length}:**\n\n${nextQ.text}`,
-            timestamp: new Date().toISOString(),
-            isAssessmentQuestion: true,
-            questionIndex: nextIndex,
-            options: nextQ.options,
-          };
-          setMessages(prev => [...prev, nextMsg]);
-        }, 400);
+        setIsSubmitting(false);
       }
     }
-  }, [assessmentState, activeAssessmentId, todaysFocus, serverContext, isSubmittingAssessment]);
-
-  // Mode change handler
-  const handleModeChange = (newMode: MentorMode) => {
-    setMode(newMode);
-    setAssessmentState(null);
-    setAssessmentResults(null);
-    setActiveAssessmentId(null);
-    setSessionActive(false);
-
-    const modeMsg: MentorMessage = {
-      id: `mode-change-${Date.now()}`,
-      sender: 'ai',
-      text: `Switched to **${newMode.charAt(0).toUpperCase() + newMode.slice(1)}** mode. ${
-        newMode === 'learn'
-          ? "I'll focus on conceptual explanations, intuitive breakdowns, and architecture insights."
-          : newMode === 'practice'
-          ? "I'll generate targeted code challenges and problem walkthroughs. Click **Start Session** to begin!"
-          : "I'll test your knowledge with structured assessment questions. Click **Start Session** to begin."
-      }`,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, modeMsg]);
   };
 
-  // Key press handler
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const getProgressBarColor = (progress: number) => {
-    if (progress >= 80) return 'bg-emerald-500';
-    if (progress >= 60) return 'bg-blue-500';
-    if (progress >= 40) return 'bg-amber-500';
-    return 'bg-rose-500';
-  };
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  const currentQ = questions[currentIndex];
+  const progressPercent = Math.round(((currentIndex) / Math.max(1, questions.length)) * 100);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start max-w-7xl mx-auto">
 
       {/* ================================================================ */}
-      {/* LEFT COLUMN — Chat (8 cols on desktop) */}
+      {/* MAIN ASSESSMENT WORKSPACE (8 cols) */}
       {/* ================================================================ */}
-      <div className="lg:col-span-8 flex flex-col gap-4">
+      <div className="lg:col-span-8 flex flex-col gap-5">
 
-        {/* Mentor Header */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Top Header Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ea580c] to-[#f97316] flex items-center justify-center text-white shadow-sm shadow-[#ea580c]/20">
-                <Sparkles className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#ea580c] to-[#f97316] flex items-center justify-center text-white shadow-md shadow-[#ea580c]/20">
+                <ClipboardCheck className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">AI Mentor</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Your personalized learning companion</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                    Assessment & Diagnostic Studio
+                  </h1>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 rounded-full text-[10px] font-extrabold uppercase">
+                    <ShieldCheck className="w-3 h-3" /> Live Scoring
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Assessing competencies for <strong className="text-slate-700 dark:text-slate-200">{effectiveTargetRole}</strong>
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50 rounded-full text-[10px] font-bold text-[#ea580c] uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c] animate-pulse" />
-                Personalized to your roadmap
-              </span>
+
+            {/* Current Topic Badge */}
+            <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700">
+              <Sparkles className="w-3.5 h-3.5 text-[#ea580c]" />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{activeTopic}</span>
             </div>
           </div>
         </div>
 
-        {/* Mode Selector */}
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-1.5">
-          {([
-            { id: 'learn' as MentorMode, label: 'Learn', icon: <BookOpen className="w-3.5 h-3.5" /> },
-            { id: 'practice' as MentorMode, label: 'Practice', icon: <Dumbbell className="w-3.5 h-3.5" /> },
-            { id: 'assess' as MentorMode, label: 'Assess', icon: <ClipboardCheck className="w-3.5 h-3.5" /> },
-          ]).map(m => (
-            <button
-              key={m.id}
-              onClick={() => handleModeChange(m.id)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
-                mode === m.id
-                  ? "bg-[#ea580c] text-white shadow-sm shadow-[#ea580c]/20"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800"
-              )}
-            >
-              {m.icon}
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-1.5">
-          {QUICK_ACTIONS.map((action, i) => (
-            <button
-              key={i}
-              onClick={() => handleQuickAction(action)}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:border-[#ea580c]/50 hover:text-[#ea580c] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            >
-              {getQuickActionIcon(action.icon)}
-              {action.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Conversation Area */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col h-[680px] xl:h-[750px]">
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12 space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
-                  <MessageCircle className="w-6 h-6 text-slate-300 dark:text-slate-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Start a Conversation</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Ask your mentor anything about your learning path</p>
-                </div>
+        {/* ============================================================== */}
+        {/* PRE-ASSESSMENT BRIEFING CARD (WHEN NOT STARTED) */}
+        {/* ============================================================== */}
+        {!isStarted && !isCompleted ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 shadow-sm space-y-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-950/50 text-[#ea580c] border border-orange-200 dark:border-orange-900/60 rounded-full text-xs font-extrabold uppercase tracking-wider">
+                <Target className="w-3.5 h-3.5" /> Topic Diagnostic Test
               </div>
-            ) : (
-              messages.map(msg => (
-                <div key={msg.id} className={cn("flex gap-3", msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
-                  {msg.sender === 'ai' && (
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ea580c] to-[#f97316] flex items-center justify-center text-white flex-shrink-0 mt-0.5 shadow-xs">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                  )}
-                  <div className={cn(
-                    "text-sm leading-relaxed transition-all",
-                    msg.sender === 'user'
-                      ? "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-[#ea580c] text-white rounded-br-md shadow-xs"
-                      : "flex-1 w-full rounded-2xl px-5 py-4 bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-bl-md shadow-xs"
-                  )}>
-                    <MarkdownMessageRenderer content={msg.text} isUser={msg.sender === 'user'} />
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {activeTopic} Assessment
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
+                Ready to assess your mastery? This assessment consists of <strong>5 multiple-choice questions</strong> designed to evaluate core principles, architecture tradeoffs, and implementation knowledge for your target role.
+              </p>
+            </div>
 
-                    {/* Assessment question options with live Answer Differentiation */}
-                    {msg.isAssessmentQuestion && msg.options && (
-                      <div className="mt-3 space-y-2">
-                        {msg.options.map((opt, oi) => {
-                          const qIdx = msg.questionIndex !== undefined ? msg.questionIndex : (assessmentState?.currentIndex ?? 0);
-                          const isAnswered = assessmentState?.answers && assessmentState.answers[qIdx] !== null && assessmentState.answers[qIdx] !== undefined;
-                          const isSelected = assessmentState?.answers && assessmentState.answers[qIdx] === oi;
-                          const isComplete = Boolean(assessmentState?.isComplete);
-                          const result = assessmentResults && assessmentResults[qIdx] ? assessmentResults[qIdx] : null;
-
-                          // Differentiation when assessment is complete
-                          const isCorrectChoice = result ? result.correct_option === oi : false;
-                          const isUserChoice = result ? result.selected_option === oi : isSelected;
-                          const isUserWrongChoice = isComplete && result && isUserChoice && !result.correct;
-
-                          let buttonStyle = "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#ea580c]/50 hover:bg-orange-50/50 dark:hover:bg-orange-950/20";
-                          let badge = null;
-
-                          if (isComplete && result) {
-                            if (isCorrectChoice && isUserChoice) {
-                              // User selected the correct answer (Green)
-                              buttonStyle = "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-100 font-bold shadow-xs ring-1 ring-emerald-500";
-                              badge = (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/80 px-2 py-0.5 rounded-md flex-shrink-0">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Correct
-                                </span>
-                              );
-                            } else if (isUserWrongChoice) {
-                              // User selected a wrong answer (Red)
-                              buttonStyle = "bg-rose-50 dark:bg-rose-950/50 border-rose-500 text-rose-900 dark:text-rose-100 font-bold shadow-xs ring-1 ring-rose-500";
-                              badge = (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/80 px-2 py-0.5 rounded-md flex-shrink-0">
-                                  <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Your Answer (Incorrect)
-                                </span>
-                              );
-                            } else if (isCorrectChoice && !isUserChoice) {
-                              // Correct answer that the user missed (Green Outline)
-                              buttonStyle = "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold border-dashed ring-1 ring-emerald-500/50";
-                              badge = (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md flex-shrink-0">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Correct Answer
-                                </span>
-                              );
-                            } else {
-                              // Neutral unselected wrong option
-                              buttonStyle = "bg-slate-50/50 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800/60 text-slate-400 dark:text-slate-500 opacity-60";
-                            }
-                          } else if (isSelected) {
-                            buttonStyle = "bg-orange-50 dark:bg-orange-950/40 border-[#ea580c] text-[#ea580c] font-bold shadow-xs ring-1 ring-[#ea580c]";
-                          }
-
-                          return (
-                            <button
-                              key={oi}
-                              onClick={() => handleAssessmentAnswer(qIdx, oi)}
-                              disabled={isAnswered || isSubmittingAssessment || isComplete}
-                              className={cn(
-                                "w-full flex items-center justify-between text-left px-3.5 py-2.5 rounded-xl text-xs font-medium border transition-all gap-2",
-                                buttonStyle,
-                                (isAnswered || isComplete) && !isSubmittingAssessment && "cursor-default",
-                                isSubmittingAssessment && "cursor-wait"
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold">{String.fromCharCode(65 + oi)}.</span>
-                                <span>{opt}</span>
-                              </div>
-                              {badge}
-                            </button>
-                          );
-                        })}
-
-                        {/* Detailed Per-Question Explanation Box */}
-                        {Boolean(assessmentState?.isComplete) && assessmentResults && assessmentResults[msg.questionIndex !== undefined ? msg.questionIndex : (assessmentState?.currentIndex ?? 0)] && (
-                          (() => {
-                            const res = assessmentResults[msg.questionIndex !== undefined ? msg.questionIndex : (assessmentState?.currentIndex ?? 0)];
-                            return (
-                              <div className={cn(
-                                "mt-3 p-3.5 rounded-xl border text-xs leading-relaxed transition-all shadow-xs",
-                                res.correct
-                                  ? "bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60 text-emerald-950 dark:text-emerald-100"
-                                  : "bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60 text-rose-950 dark:text-rose-100"
-                              )}>
-                                <div className="flex items-center gap-1.5 font-bold mb-1.5">
-                                  {res.correct ? (
-                                    <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
-                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                      Well done! Correct Answer
-                                    </span>
-                                  ) : (
-                                    <span className="flex items-center gap-1 text-rose-700 dark:text-rose-300">
-                                      <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                                      Incorrect — Correct is Option {String.fromCharCode(65 + res.correct_option)}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-slate-700 dark:text-slate-300 font-normal leading-relaxed">
-                                  {res.explanation}
-                                </p>
-                              </div>
-                            );
-                          })()
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {msg.sender === 'user' && (
-                    <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 flex-shrink-0 mt-0.5 text-xs font-bold">
-                      {(effectiveUserName[0] || 'U').toUpperCase()}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-
-            {/* Loading indicator */}
-            {isLoading && (
-              <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#ea580c] to-[#f97316] flex items-center justify-center text-white flex-shrink-0">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5">
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-typing-1" />
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-typing-2" />
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-typing-3" />
-                </div>
+            {/* Parameter Info Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Question Count</span>
+                <span className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <ClipboardCheck className="w-4 h-4 text-[#ea580c]" /> 5 Questions
+                </span>
+                <span className="text-[11px] text-slate-500">Multiple choice [A, B, C, D]</span>
               </div>
-            )}
 
-            <div ref={messagesEndRef} />
-          </div>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Estimated Time</span>
+                <span className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-500" /> 10 - 15 Mins
+                </span>
+                <span className="text-[11px] text-slate-500">Self-paced diagnostic</span>
+              </div>
 
-          {/* Message Composer */}
-          <div className="border-t border-slate-100 dark:border-slate-800 p-3">
-            <div className="flex items-center gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Ask your mentor anything about your learning path..."
-                disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#ea580c]/30 focus:border-[#ea580c]/50 transition-all disabled:opacity-50"
-              />
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Current Mastery</span>
+                <span className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-emerald-500" /> {previousMastery}% Assessed
+                </span>
+                <span className="text-[11px] text-slate-500">Pass target: ≥ 70%</span>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="p-4 rounded-2xl bg-orange-50/50 dark:bg-orange-950/30 border border-orange-200/70 dark:border-orange-900/40 text-xs text-slate-700 dark:text-slate-300 space-y-1.5">
+              <div className="font-bold text-[#ea580c] flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4" /> Assessment Guidelines:
+              </div>
+              <ul className="list-disc pl-4 space-y-1 font-medium text-[11px]">
+                <li>Answer each of the 5 questions by clicking your choice and advancing with Next Question.</li>
+                <li>Upon submitting Question 5, the server will authoritatively score your responses.</li>
+                <li>You will receive a question-by-question review, gap explanations, and recommended study items.</li>
+                <li>Your roadmap and skill matrix progress will immediately rise based on your score.</li>
+              </ul>
+            </div>
+
+            {/* Prominent Start Button */}
+            <div className="pt-2 flex items-center justify-end">
               <button
-                onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputValue.trim()}
-                className="p-2.5 bg-[#ea580c] hover:bg-[#d84d08] disabled:bg-slate-200 dark:disabled:bg-slate-700 text-white disabled:text-slate-400 dark:disabled:text-slate-500 rounded-xl transition-all shadow-sm shadow-[#ea580c]/20 disabled:shadow-none cursor-pointer disabled:cursor-not-allowed"
+                onClick={handleStartAssessment}
+                disabled={isLoading}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-black text-sm shadow-lg shadow-[#ea580c]/30 flex items-center justify-center gap-3 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Preparing 5 Questions...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" /> Start 5-Question Assessment <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
           </div>
-        </div>
+        ) : isLoading ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 text-[#ea580c] animate-spin" />
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Preparing Assessment Questions...</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Calibrating 5 domain questions for {activeTopic}</p>
+          </div>
+        ) : !isCompleted && currentQ ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-6 sm:p-8 flex flex-col gap-6">
+
+            {/* Question Header & Stepper */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-extrabold uppercase tracking-wider text-[#ea580c]">
+                  Question {currentIndex + 1} of {questions.length}
+                </span>
+                <span className="font-bold">{progressPercent}% Progress</span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex gap-1">
+                {questions.map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "h-full flex-1 rounded-full transition-all duration-300",
+                      i < currentIndex ? "bg-emerald-500" :
+                      i === currentIndex ? "bg-[#ea580c]" :
+                      "bg-slate-200 dark:bg-slate-700"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Question Text */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-relaxed">
+                {currentQ.text}
+              </h2>
+            </div>
+
+            {/* Multiple Choice Options */}
+            <div className="space-y-3">
+              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                Select the correct answer:
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                {currentQ.options.map((opt, oi) => {
+                  const isSelected = selectedOption === oi;
+                  return (
+                    <button
+                      key={oi}
+                      onClick={() => handleSelectOption(oi)}
+                      className={cn(
+                        "w-full p-4 rounded-xl text-left text-xs sm:text-sm font-medium border transition-all flex items-center justify-between gap-3 cursor-pointer group",
+                        isSelected
+                          ? "bg-orange-50/90 dark:bg-orange-950/50 border-[#ea580c] ring-2 ring-[#ea580c]/30 text-slate-900 dark:text-white shadow-xs font-semibold"
+                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#ea580c]/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/80"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 transition-colors",
+                          isSelected
+                            ? "bg-[#ea580c] text-white"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-orange-100 dark:group-hover:bg-orange-900/40 group-hover:text-[#ea580c]"
+                        )}>
+                          {String.fromCharCode(65 + oi)}
+                        </span>
+                        <span>{opt}</span>
+                      </div>
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                        isSelected ? "border-[#ea580c] bg-[#ea580c]" : "border-slate-300 dark:border-slate-600"
+                      )}>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
+              <span className="text-xs text-slate-400">
+                {selectedOption === null ? "Please select an answer to continue" : "Answer selected"}
+              </span>
+              <button
+                onClick={handleNextQuestion}
+                disabled={selectedOption === null || isSubmitting}
+                className="px-6 py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] disabled:opacity-50 text-white font-bold text-sm shadow-md shadow-[#ea580c]/20 transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Evaluating...
+                  </>
+                ) : currentIndex + 1 === questions.length ? (
+                  <>
+                    <Sparkles className="w-4 h-4" /> Submit & Get Evaluation
+                  </>
+                ) : (
+                  <>
+                    Next Question <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : isCompleted ? (
+
+          /* ============================================================ */
+          /* COMPREHENSIVE POST-ASSESSMENT REVIEW & STUDY PLAN */
+          /* ============================================================ */
+          <div className="space-y-6">
+
+            {/* Hero Score Card */}
+            <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-[#ea580c]/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+                <div className="space-y-2 text-center sm:text-left">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Assessment Evaluated
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                    {scorePercent >= 80 ? 'Mastery Verified!' : scorePercent >= 50 ? 'Good Progress!' : 'Knowledge Gaps Identified'}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 max-w-md leading-relaxed">
+                    Evaluated topic: <strong className="text-white">{activeTopic}</strong> for your role as <strong>{effectiveTargetRole}</strong>.
+                  </p>
+                </div>
+
+                {/* Score Circular Badge */}
+                <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                  <div className="text-center">
+                    <span className="text-3xl sm:text-4xl font-black text-[#ff6b4a] block">{scorePercent}%</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{correctCount} / {questions.length} Correct</span>
+                  </div>
+                  <div className="h-10 w-px bg-white/10" />
+                  <div className="text-center">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-400 block">{newMastery}%</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Assessed Mastery</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress delta note */}
+              <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Mastery raised from <strong>{previousMastery}%</strong> → <strong className="text-emerald-400">{newMastery}%</strong></span>
+                </div>
+                <span className="text-slate-400">Roadmap timeline and skill matrix updated</span>
+              </div>
+            </div>
+
+            {/* Diagnostic Question-by-Question Review */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-[#ea580c]" /> Question-by-Question Review
+                </h3>
+                <span className="text-xs text-slate-500 font-bold">{correctCount}/{detailedResults.length} Passed</span>
+              </div>
+
+              <div className="space-y-4">
+                {detailedResults.map((r, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "p-4 rounded-xl border transition-all text-xs space-y-2.5",
+                      r.correct
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40"
+                        : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span>Q{i + 1}.</span>
+                        <span>{r.question_text}</span>
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-extrabold px-2 py-0.5 rounded-md flex-shrink-0 flex items-center gap-1",
+                        r.correct
+                          ? "bg-emerald-100 dark:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300"
+                          : "bg-rose-100 dark:bg-rose-900/80 text-rose-700 dark:text-rose-300"
+                      )}>
+                        {r.correct ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {r.correct ? 'Correct' : 'Incorrect'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                      <div className="p-2 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Your Selection</span>
+                        <span className={cn("font-semibold", r.correct ? "text-emerald-600" : "text-rose-600")}>
+                          {r.selected_option >= 0 ? `${String.fromCharCode(65 + r.selected_option)}. ${r.options[r.selected_option]}` : 'None selected'}
+                        </span>
+                      </div>
+                      {!r.correct && (
+                        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/40">
+                          <span className="text-emerald-700 dark:text-emerald-400 block text-[10px] uppercase font-bold">Correct Answer</span>
+                          <span className="font-semibold text-emerald-800 dark:text-emerald-200">
+                            {String.fromCharCode(65 + r.correct_option)}. {r.options[r.correct_option]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-[11px] pt-1 border-t border-slate-200/40 dark:border-slate-800/40">
+                      💡 <strong>Concept Takeaway:</strong> {r.explanation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Personalized Study Plan & What You Need to Learn */}
+            <div className="p-6 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/40 space-y-3 text-xs leading-relaxed">
+              <div className="flex items-center gap-2 text-[#ea580c] font-black uppercase tracking-wider text-xs">
+                <AlertCircle className="w-4 h-4" /> Next Steps & Study Plan for {effectiveTargetRole}
+              </div>
+              <div className="text-slate-700 dark:text-slate-300 space-y-2">
+                <p>
+                  Based on this assessment, here is your prioritized study action plan:
+                </p>
+                <ol className="list-decimal pl-4 space-y-1.5 font-medium">
+                  {detailedResults.filter(r => !r.correct).length > 0 ? (
+                    detailedResults.filter(r => !r.correct).map((w, idx) => (
+                      <li key={idx}>
+                        <strong>Review Core Concept:</strong> {w.explanation}
+                      </li>
+                    ))
+                  ) : (
+                    <li>Full competency verified for this topic. Proceed to the next curriculum milestone.</li>
+                  )}
+                  <li>Check the curated study resources in your <strong>Roadmap Stage Panel</strong> for in-depth architecture diagrams.</li>
+                  <li>Retake this assessment anytime to increase your verified mastery above 85%.</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Bottom Navigation CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <button
+                onClick={handleStartAssessment}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Retake This Assessment
+              </button>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  onClick={() => onNavigate('roadmap')}
+                  className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <Map className="w-3.5 h-3.5" /> View Updated Roadmap
+                </button>
+
+                {stageTopics.find(t => t.name !== activeTopic) && (
+                  <button
+                    onClick={() => {
+                      const next = stageTopics.find(t => t.name !== activeTopic);
+                      if (next) handleSelectTopic(next.name);
+                    }}
+                    className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-[#ea580c] hover:bg-[#d84d08] text-white font-bold text-xs shadow-md shadow-[#ea580c]/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    Select Next Topic <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ================================================================ */}
-      {/* RIGHT COLUMN — Sidebar (4 cols on desktop) */}
+      {/* RIGHT SIDEBAR — TOPICS MASTERY & PROGRESS TRACKER (4 cols) */}
       {/* ================================================================ */}
-      <div className="lg:col-span-4 flex flex-col gap-4">
+      <div className="lg:col-span-4 space-y-4">
 
-        {/* ------------------------------------------------------------ */}
-        {/* 1. TODAY'S FOCUS CARD */}
-        {/* ------------------------------------------------------------ */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#ea580c]" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Today's Focus</h3>
+        {/* Active Stage & Topics Tracker */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase text-[#ea580c] tracking-wider block">Active Milestone</span>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                {currentStage?.title || 'Embedded Systems'}
+              </h3>
             </div>
+            <span className="px-2 py-0.5 bg-orange-50 text-[#ea580c] rounded-md text-[10px] font-bold border border-orange-200">
+              {stageTopics.length} Topics
+            </span>
           </div>
 
-          <div className="p-4">
-            {todaysFocus ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{todaysFocus.domain}</p>
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">{todaysFocus.skill}</h4>
-                  {todaysFocus.topic && (
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{todaysFocus.topic}</p>
-                  )}
-                </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Click any topic below to view its briefing and start its 5-question verified assessment:
+          </p>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                    todaysFocus.priority === 'HIGH'
-                      ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800'
-                      : todaysFocus.priority === 'MEDIUM'
-                      ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
-                      : 'bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                  )}>
-                    {todaysFocus.priority} PRIORITY
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {todaysFocus.estimatedMinutes} min
-                  </span>
-                </div>
-
-                {/* Mastery bar */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Mastery</span>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">{todaysFocus.mastery}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-700 ease-out", getProgressBarColor(todaysFocus.mastery))}
-                      style={{ width: `${todaysFocus.mastery}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Reason */}
-                <p className="text-xs text-slate-500 dark:text-slate-400 italic leading-relaxed">
-                  {todaysFocus.reason}
-                </p>
-
-                {/* Start / Restart Session button */}
+          {/* Topic Cards List */}
+          <div className="space-y-2.5">
+            {stageTopics.map((t) => {
+              const isActive = t.name === activeTopic;
+              const isAssessed = t.mastery > 0;
+              return (
                 <button
-                  onClick={() => sessionActive ? handleRestartSession() : handleStartSession()}
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#ea580c] hover:bg-[#d84d08] disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all shadow-sm shadow-[#ea580c]/20 cursor-pointer"
+                  key={t.id}
+                  onClick={() => handleSelectTopic(t.name)}
+                  className={cn(
+                    "w-full p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-2 group",
+                    isActive
+                      ? "bg-orange-50/80 dark:bg-orange-950/40 border-[#ea580c] ring-1 ring-[#ea580c]/30 shadow-xs"
+                      : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                  )}
                 >
-                  <Zap className="w-4 h-4" />
-                  {sessionActive ? 'Restart Session' : 'Start Session'}
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-4 space-y-2">
-                <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto border border-slate-100 dark:border-slate-700">
-                  <AlertTriangle className="w-5 h-5 text-slate-300 dark:text-slate-600" />
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Calculating your learning focus...
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------ */}
-        {/* 2. CURRENT ROADMAP CARD */}
-        {/* ------------------------------------------------------------ */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="flex items-center gap-2">
-              <Map className="w-4 h-4 text-[#ea580c]" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Current Roadmap</h3>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {currentStage ? (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Stage {currentStage.id} of {stages.length}</p>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">{currentStage.title}</h4>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#ea580c] mt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c] animate-pulse" />
-                      In Progress
+                  <div className="flex items-center justify-between">
+                    <span className={cn(
+                      "text-xs font-bold transition-colors",
+                      isActive ? "text-[#ea580c]" : "text-slate-800 dark:text-slate-200 group-hover:text-[#ea580c]"
+                    )}>
+                      {t.name}
+                    </span>
+                    <span className={cn(
+                      "text-[10px] font-extrabold px-2 py-0.5 rounded-full border",
+                      t.mastery >= 70 ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                      t.mastery > 0 ? "bg-orange-50 text-[#ea580c] border-orange-200" :
+                      "bg-slate-100 text-slate-500 border-slate-200"
+                    )}>
+                      {t.mastery}%
                     </span>
                   </div>
-                </div>
 
-                {/* Progress */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Overall Progress</span>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">{progressPercentage}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  {/* Progress Bar */}
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-[#ea580c] to-[#f97316] rounded-full transition-all duration-700 ease-out"
-                      style={{ width: `${progressPercentage}%` }}
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        t.mastery >= 70 ? "bg-emerald-500" : t.mastery > 0 ? "bg-[#ea580c]" : "bg-slate-300"
+                      )}
+                      style={{ width: `${t.mastery}%` }}
                     />
                   </div>
-                </div>
 
-                {/* Next stage */}
-                {nextStage && (
-                  <div className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Next Stage</p>
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{nextStage.title}</p>
-                    </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {t.estimated_time}
+                    </span>
+                    <span className="text-[#ea580c] font-bold flex items-center gap-0.5 group-hover:underline">
+                      {isAssessed ? 'Re-Assess' : 'Take Test'} <ChevronRight className="w-3 h-3" />
+                    </span>
                   </div>
-                )}
-
-                {/* Blockers */}
-                {todaysFocus?.blocksStage && (
-                  <div className="flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      <strong>{todaysFocus.skill}</strong> is blocking progress to <strong>{todaysFocus.blocksStage}</strong>
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => onNavigate('roadmap')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                >
-                  <Map className="w-3.5 h-3.5" />
-                  View Roadmap
                 </button>
-              </>
-            ) : (
-              <div className="text-center py-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">No active roadmap stage found.</p>
-                <button
-                  onClick={() => onNavigate('roadmap')}
-                  className="mt-2 text-xs font-bold text-[#ea580c] hover:text-[#d84d08] transition-colors cursor-pointer"
-                >
-                  View Roadmap →
-                </button>
-              </div>
-            )}
+              );
+            })}
           </div>
         </div>
 
-        {/* ------------------------------------------------------------ */}
-        {/* 3. SKILL SNAPSHOT CARD */}
-        {/* ------------------------------------------------------------ */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#ea580c]" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Skill Snapshot</h3>
-            </div>
+        {/* Assessment Rules Info */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold">
+            <Award className="w-4 h-4 text-[#ea580c]" /> Progress Calculation Rule
           </div>
-
-          <div className="p-4 space-y-3">
-            {snapshotSkills.length > 0 ? (
-              <>
-                {snapshotSkills.map(skill => (
-                  <div key={skill.id} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{skill.name}</span>
-                        {skill.id === todaysFocus?.skillId && (
-                          <span className="text-[8px] font-bold bg-orange-100 dark:bg-orange-950/30 text-[#ea580c] px-1.5 py-0.5 rounded-full">FOCUS</span>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{skill.progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full rounded-full transition-all duration-500", getProgressBarColor(skill.progress))}
-                        style={{ width: `${skill.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  onClick={() => onNavigate('skills')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer mt-2"
-                >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  View Skill Matrix
-                </button>
-              </>
-            ) : (
-              <div className="text-center py-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">No skill data available yet.</p>
-              </div>
-            )}
-          </div>
+          <p className="leading-relaxed text-[11px]">
+            Mastery is calculated authoritatively from your assessment performance. Complete each topic quiz to unlock downstream milestone prerequisites.
+          </p>
         </div>
-
-        {/* Assessment Result Badge (shown after assessment) */}
-        {assessmentState?.isComplete && (
-          <div className={cn(
-            "border rounded-2xl shadow-sm p-4",
-            assessmentState.score! >= 80
-              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
-              : assessmentState.score! >= 50
-              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
-              : "bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800"
-          )}>
-            <div className="flex items-center gap-3">
-              {assessmentState.score! >= 80 ? (
-                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-              ) : assessmentState.score! >= 50 ? (
-                <AlertTriangle className="w-8 h-8 text-amber-500" />
-              ) : (
-                <XCircle className="w-8 h-8 text-rose-500" />
-              )}
-              <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Assessment Score: {assessmentState.score}%</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {todaysFocus?.skill} — Mastery updated to {todaysFocus?.mastery}%
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
-
-export default AIMentorPage;

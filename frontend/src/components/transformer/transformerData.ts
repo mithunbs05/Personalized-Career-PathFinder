@@ -86,12 +86,12 @@ export const EMBEDDED_MODULES: TransformerModule[] = [
     subtitle: 'Master bit manipulation, memory-mapped I/O registers, volatile pointers, and struct packing in Embedded C.',
     description: 'Master low-level bitwise operations, volatile memory semantics, and register control for microcontroller hardware interfacing.',
     duration: '25 mins',
-    initialConceptScore: 90,
-    initialPracticeScore: 70,
-    initialTestsPassed: 4,
-    initialTotalTests: 5,
-    initialMastery: 'Proficient',
-    initialRecommendation: 'Your register bitwise masking is strong. Proceed to interrupt priority configuration.',
+    initialConceptScore: 0,
+    initialPracticeScore: 0,
+    initialTestsPassed: 0,
+    initialTotalTests: 3,
+    initialMastery: 'Novice',
+    initialRecommendation: 'Take the verified assessment or run the test cases to evaluate and increase your competency score.',
     objectives: [
       'Master bitwise AND, OR, XOR, and NOT operations on hardware registers',
       'Understand volatile pointer access to prevent compiler optimization removal',
@@ -167,12 +167,12 @@ export const EMBEDDED_MODULES: TransformerModule[] = [
     subtitle: 'Configure hardware peripherals, baud rates, parity, and interrupt service routines on ARM microcontrollers.',
     description: 'Master serial communication buses, clock tree configuration, and NVIC interrupt handling on ARM Cortex-M architecture.',
     duration: '30 mins',
-    initialConceptScore: 85,
-    initialPracticeScore: 65,
-    initialTestsPassed: 3,
-    initialTotalTests: 5,
-    initialMastery: 'Developing',
-    initialRecommendation: 'Understand packet frame validation before writing DMA drivers.',
+    initialConceptScore: 0,
+    initialPracticeScore: 0,
+    initialTestsPassed: 0,
+    initialTotalTests: 2,
+    initialMastery: 'Novice',
+    initialRecommendation: 'Take the assessment to evaluate frame validation and register calculations.',
     objectives: [
       'Calculate UART baud rate register divisors accurately',
       'Understand I2C 7-bit addressing, ACK/NACK signaling, and clock stretching',
@@ -228,12 +228,12 @@ export const EMBEDDED_MODULES: TransformerModule[] = [
     subtitle: 'Design deterministic multitasking systems with task priority scheduling, mutexes, and queues in FreeRTOS.',
     description: 'Master preemptive task scheduling, priority inversion prevention, binary semaphores, and inter-task message queues.',
     duration: '35 mins',
-    initialConceptScore: 80,
-    initialPracticeScore: 60,
-    initialTestsPassed: 3,
-    initialTotalTests: 5,
-    initialMastery: 'Developing',
-    initialRecommendation: 'Practice thread-safe circular buffers to prevent race conditions.',
+    initialConceptScore: 0,
+    initialPracticeScore: 0,
+    initialTestsPassed: 0,
+    initialTotalTests: 2,
+    initialMastery: 'Novice',
+    initialRecommendation: 'Test thread-safe ring buffer synchronization.',
     objectives: [
       'Understand preemptive priority scheduling and tick interrupts',
       'Prevent priority inversion using priority inheritance mutexes',
@@ -294,12 +294,12 @@ export const CYBERSECURITY_MODULES: TransformerModule[] = [
     subtitle: 'Inspect TCP/IP handshakes, encrypted TLS payloads, DNS queries, and port scanning anomalies.',
     description: 'Master packet-level network analysis, protocol vulnerabilities, and perimeter defense strategies.',
     duration: '25 mins',
-    initialConceptScore: 88,
-    initialPracticeScore: 70,
-    initialTestsPassed: 4,
-    initialTotalTests: 5,
-    initialMastery: 'Proficient',
-    initialRecommendation: 'Solid network fundamentals. Proceed to web application vulnerability assessment.',
+    initialConceptScore: 0,
+    initialPracticeScore: 0,
+    initialTestsPassed: 0,
+    initialTotalTests: 3,
+    initialMastery: 'Novice',
+    initialRecommendation: 'Take the network packet assessment to evaluate your score.',
     objectives: [
       'Analyze 3-way TCP handshakes (SYN, SYN-ACK, ACK)',
       'Detect anomalous port scanning signatures and SYN floods',
@@ -358,12 +358,12 @@ export const AI_ML_MODULES: TransformerModule[] = [
     subtitle: 'Master the mechanics of for-loops, iterators, conditional accumulation, and list comprehension in Python.',
     description: 'Master the mechanics of for-loops, iterators, conditional accumulation, and list comprehension in Python — foundational tools for AI data pipelines.',
     duration: '25 mins',
-    initialConceptScore: 100,
-    initialPracticeScore: 60,
-    initialTestsPassed: 3,
-    initialTotalTests: 5,
-    initialMastery: 'Developing',
-    initialRecommendation: 'You understand Python loops conceptually, but your edge-case accuracy is still developing. Recommended: Try one more guided challenge before moving to nested loops.',
+    initialConceptScore: 0,
+    initialPracticeScore: 0,
+    initialTestsPassed: 0,
+    initialTotalTests: 3,
+    initialMastery: 'Novice',
+    initialRecommendation: 'Take the assessment challenge to verify test case completion and raise your progress.',
     objectives: [
       'Master for-loops and sequence iteration in Python',
       'Implement conditional filtering inside loops (even/odd checks)',
@@ -389,7 +389,8 @@ export const AI_ML_MODULES: TransformerModule[] = [
         title: 'Conditional Filtering & Predicates',
         startTime: 150,
         duration: 200,
-        transcript: "When filtering data during iteration, we test each item against a predicate. For instance, testing for even numbers using 'num % 2 == 0'.",
+        transcript: "When filtering data during iteration, we test each item against a predicate. For instance, testing for even numbers using 'num % 2 == 0'."
+        ,
         codeDemo: `# Handling edge cases\ndef sum_even_numbers(numbers):\n    if not numbers:\n        return 0\n    total = 0\n    for n in numbers:\n        if n % 2 == 0:\n            total += n\n    return total\n\nprint(sum_even_numbers([]))           # 0\nprint(sum_even_numbers([1, 3, 5]))     # 0\nprint(sum_even_numbers([-2, -4, 3]))   # -6`
       }
     ],
@@ -464,32 +465,29 @@ export function getModulesForRole(targetRole?: string, stages?: any[]): Transfor
 export function createInitialProgress(module: TransformerModule): LearnerProgress {
   return {
     moduleId: module.id,
-    videoWatchedPercent: module.initialConceptScore,
+    videoWatchedPercent: 0,
     currentChapterIndex: 0,
     videoTimePosition: 0,
     writtenCode: module.challenge.starterCode,
-    testResults: {
-      tc1: 'pending',
-      tc2: 'pending',
-      tc3: 'pending'
-    },
+    testResults: {},
     hintsUsed: 0,
     attempts: 0,
-    masteryLevel: module.initialMastery,
-    conceptScore: module.initialConceptScore,
-    practiceScore: module.initialPracticeScore,
-    testsPassed: module.initialTestsPassed,
-    totalTests: module.initialTotalTests,
-    recommendation: module.initialRecommendation,
+    masteryLevel: 'Novice',
+    conceptScore: 0,
+    practiceScore: 0,
+    testsPassed: 0,
+    totalTests: module.challenge.testCases.length || 3,
+    recommendation: 'Complete the assessment challenges to evaluate test cases and raise your verified progress score.',
     currentDifficulty: module.challenge.difficulty,
     lastMode: 'video'
   };
 }
 
-export function computeMasteryLevel(conceptScore: number, practiceScore: number): MasteryLevel {
-  const combined = (conceptScore * 0.4) + (practiceScore * 0.6);
-  if (combined >= 88) return 'Mastered';
-  if (combined >= 70) return 'Proficient';
-  if (combined >= 45) return 'Developing';
+export function computeMasteryLevel(testsPassed: number, totalTests: number): MasteryLevel {
+  if (totalTests <= 0) return 'Novice';
+  const ratio = testsPassed / totalTests;
+  if (ratio >= 0.9) return 'Mastered';
+  if (ratio >= 0.65) return 'Proficient';
+  if (ratio >= 0.35) return 'Developing';
   return 'Novice';
 }
